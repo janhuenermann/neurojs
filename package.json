@@ -1,0 +1,30 @@
+{
+  "name": "neurojs",
+  "version": "2.0.0",
+  "description": "A modular and modern deep-learning library for JavaScript designed to solve supervised and unsupervised problems.",
+  "main": "index.js",
+  "directories": {
+    "example": "examples"
+  },
+  "scripts": {
+    "build": "babel src -d lib"
+  },
+  "keywords": [
+    "deep-learning",
+    "neural-network",
+    "reinforcement-learning",
+    "deep-q-learning"
+  ],
+  "author": "Jan Hünermann",
+  "license": "ISC",
+  "devDependencies": {
+    "babel-cli": "^6.14.0",
+    "babel-core": "^6.14.0",
+    "babel-loader": "^6.2.5",
+    "babel-preset-es2015": "^6.14.0",
+    "webpack": "^1.13.1"
+  },
+  "dependencies": {
+    "colors": "^1.1.2"
+  }
+}
