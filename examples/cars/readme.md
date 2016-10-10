@@ -1,4 +1,4 @@
-![Screen-capture of cars][live.gif]
+![Screen-capture of cars](live.gif)
 
 # Advanced car demo
 This is a car demo, that shows the capabilities of neurojs. It shows it successfully can converge to a control policy, that not only can avoid objects and obstacles, but can avoid other cars. 
