@@ -126,7 +126,7 @@ class Agent {
 	}
 
 	/**
-	 * Adds an experience to the buffer and replays an batch of experiences
+	 * Adds an experience to the buffer and replays a batch of experiences
 	 * @param  {Float} reward
 	 * @return {Float}        The loss
 	 */
