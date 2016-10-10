@@ -5,7 +5,10 @@ var Buffers = require('./replay-buffers.js')
 var DQN = require('./algorithms/dqn.js')
 var DDPG = require('./algorithms/ddpg.js')
 
-
+/**
+ * The Agent class represents the
+ * reinforcement-learner.
+ */
 class Agent {
 
 	constructor(opt) {
