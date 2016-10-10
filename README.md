@@ -8,9 +8,9 @@
 - High-performance
 
 # Examples
-- [Self-driving car](/janhuenermann/neurojs/tree/master/examples/cars)
-- [Advanced XOR](/janhuenermann/neurojs/tree/master/examples/adv-xor)
-- [Karpathy's Waterworld](/janhuenermann/neurojs/tree/master/examples/waterworld)
+- [Self-driving car](/examples/cars)
+- [Advanced XOR](/examples/adv-xor)
+- [Karpathy's Waterworld](/examples/waterworld)
 
 # Blog post
 I wrote a blog post about this framework with an interactive car-demo embeded [on my blog](http://lab.janhuenermann.de/article/learning-to-drive#car-container), check it out!
