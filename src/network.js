@@ -179,6 +179,7 @@ class Model {
 			case 'softmax': return new regression.SoftmaxLayer(inp, opt)
 			case 'noise': return new noise.UhlenbeckOrnsteinNoiseLayer(inp, opt)
 			case 'bayesian': return new bayesian.VariationalBayesianLayer(inp, opt)
+			case 'conf': return new bayesian.ConfidenceLayer(inp, opt)
 		}
 
 		throw 'error'
@@ -225,6 +226,9 @@ class Configuration {
 		return optimizer
 	}
 
+	freeze(val = true) {
+		this.freezed = val
+	}
 
 	optimize(accu) {
 		if (accu !== false) this.accumulate(Number.isInteger(accu) ? accu : undefined)
@@ -238,6 +242,7 @@ class Configuration {
 
 
 	forEachParameter(cb) {
+		if (this.freezed) return
 		for (var i = 0; i < this.parameters.length; i++) { 
 			var param = this.parameters[i]
 			if (param === undefined) 
@@ -378,10 +383,12 @@ class State {
 	 * @param  {Float64Array} grad
 	 */
 	backwardWithGradient(grad) {
-		if (!isNaN(grad) && this.out.dw.length === 1)
+		if (Array.isArray(grad))
+			this.out.dw.set(grad)
+		else if (this.out.dw.length === 1)
 			this.out.dw[0] = grad
 		else
-			this.out.dw.set(grad)
+			throw 'error grad not propagatable';
 
 		this.propagate()
 	}
@@ -427,6 +434,13 @@ class State {
 
 	// backwards pass
 	propagate() {
+		// safety check
+		for (var i = 0; i < this.out.dw.length; i++) {
+			if (isNaN(this.out.dw[i])) {
+				throw 'warning: terror!';
+			}
+		}
+
 		for (var i = this.layers.length - 1; i >= 0; i--) {
 			if (this.layers[i].passthrough) 
 				continue ;

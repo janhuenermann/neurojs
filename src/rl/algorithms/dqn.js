@@ -87,7 +87,7 @@ class DQN {
 	}
 
 	// adjust weights etc
-	learn(e) {
+	learn() {
 		this.net.configuration.optimize(false)
 		this.targetUpdate()
 	}
@@ -108,7 +108,12 @@ class DQN {
 
 
 	import(params) {
+		if (params.length !== this.net.configuration.countOfParameters)
+			return false
+
 		this.net.configuration.read(params)
+
+		return true
 	}
 
 	export() {

@@ -15,9 +15,28 @@ class DDPG {
 		this.critic = agent.options.critic.newState()
 
 		// target networks
-		this.targetActor = this.actor.model.newState() // agent.options.target.actor.newState()
-		this.targetCritic = this.critic.model.newState() // agent.options.target.critic.newState()
+		if (agent.options.targetActor) {
+			if (agent.options.targetActor.model !== this.actor.model)
+				throw 'Target actor model not right';
 
+			this.targetActor = agent.options.targetActor.newState()
+		}
+
+		else {
+			this.targetActor = this.actor.model.newState() // agent.options.target.actor.newState()
+		}
+			
+		if (agent.options.targetCritic) {
+			if (agent.options.targetCritic.model !== this.critic.model)
+				throw 'Target critic model not right';
+
+			this.targetCritic = agent.options.targetCritic.newState()
+		}
+
+		else {
+			this.targetCritic = this.critic.model.newState() // agent.options.target.actor.newState()
+		}
+			
 		this.targetActor.configuration.copyParametersFrom(this.actor.configuration)
 		this.targetCritic.configuration.copyParametersFrom(this.critic.configuration)
 
@@ -75,10 +94,25 @@ class DDPG {
 		var value = e.estimate()
 
 		var grad = value - target
-		var gradAL = grad + this.options.alpha * (value - this.agent.evaluate(e.state0, true)) // advantage learning
-		var isw = this.buffer.getImportanceSamplingWeight(e)
+		var gradAL = grad
+
+		if (this.options.alpha > 0) {
+			gradAL = grad + this.options.alpha * (value - this.agent.evaluate(e.state0, true)) // advantage learning
+		}
+
+		if (isNaN(gradAL)) {
+			console.log(target)
+			console.log(value)
+			console.log(grad)
+			console.log(gradAL)
+
+			throw 'NaN'
+
+			return 0.0
+		}
 
 		if (descent) {
+			var isw = this.buffer.getImportanceSamplingWeight(e)
 			this.critic.backwardWithGradient(gradAL * isw)
 			this.critic.configuration.accumulate()
 			this.teach(e, isw)
@@ -102,7 +136,7 @@ class DDPG {
 		}
 	}
 
-	learn(e) {
+	learn() {
 		// Improve through batch accumuluated gradients
 		this.actor.configuration.optimize(false)
 		this.critic.configuration.optimize(false)
@@ -112,10 +146,8 @@ class DDPG {
 	}
 
 	targetNetworkUpdates() {
-		if (this.options.theta < 1) {
-			this.targetCritic.configuration.forEachParameter(this.targetCriticUpdate)
-			this.targetActor.configuration.forEachParameter(this.targetActorUpdate)
-		}
+		this.targetActor.configuration.forEachParameter(this.targetActorUpdate)
+		this.targetCritic.configuration.forEachParameter(this.targetCriticUpdate)
 	}
 
 	progressiveCopy(net, param, index) {
@@ -130,6 +162,9 @@ class DDPG {
 		var a_count = this.actor.configuration.countOfParameters
 		var c_count = this.critic.configuration.countOfParameters
 
+		if (params.length !== a_count + c_count)
+			return false;
+
 		var actor = params.subarray(0, a_count)
 		var critic = params.subarray(a_count, a_count + c_count)
 
@@ -138,6 +173,8 @@ class DDPG {
 
 		this.targetActor.configuration.read(actor)
 		this.targetCritic.configuration.read(critic)
+
+		return true;
 	}
 
 	export() {

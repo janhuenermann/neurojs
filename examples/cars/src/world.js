@@ -6,10 +6,14 @@ function world() {
         gravity : [0,0]
     });
 
-    this.p2.solver.tolerance = 1.0
-    this.p2.solver.iterations = 20
-    this.p2.setGlobalStiffness(1e6)
-    this.p2.setGlobalRelaxation(10)
+    this.p2.solver.tolerance = 0.4
+    this.p2.solver.iterations = 10
+    this.p2.setGlobalStiffness(4000)
+    this.p2.setGlobalRelaxation(8)
+
+    this.age = 0.0
+
+    this.pool = new window.neurojs.MultiAgentPool()
 }
 
 world.prototype.addWall = function (start, end, width) {
@@ -55,10 +59,9 @@ world.prototype.addPolygons = function (polys) {
 
 world.prototype.init = function (n) {
     for (var i = 0; i < n; i++) {
-        var ag = new agent();
-
+        var ag = new agent(this);
+        ag.car.addToWorld();
         this.agents.push(ag);
-        ag.car.addToWorld(this.p2);
     }
 
     this.addWall( [ -16.571428571428573, -10.671428571428573 ], [ -16.571428571428573, 10.671428571428573 ], 0.5 )
@@ -68,14 +71,14 @@ world.prototype.init = function (n) {
 };
 
 world.prototype.step = function (dt) {
-    if (dt >= 0.02) 
-        dt = 0.02;
+    if (dt >= 0.02)  dt = 0.02;
 
     for (var i = 0; i < this.agents.length; i++) {
         this.agents[i].step(dt);
     }
 
     this.p2.step(1 / 60, dt, 10);
+    this.age += dt
 };
 
 module.exports = world;

@@ -2,9 +2,9 @@ var app = require('./src/index.js');
 
 function boot() {
     this.world = new app.world();
-    this.renderer = new app.renderer(this.world);
+    this.renderer = new app.renderer(this.world, document.getElementById("container"));
 
-    this.world.init(3);
+    this.world.init(4);
 
     this.dispatcher = new app.dispatcher(this.renderer, this.world);
     this.dispatcher.begin();
@@ -34,9 +34,37 @@ function saveAs(dv) {
 }
 
 function downloadBrain(n) {
-	var weights = window.gcd.world.agents[0].car.brain.export()
+	var weights = window.gcd.world.agents[n].car.brain.export()
 	saveAs(new DataView(weights.buffer))
 }
 
+function readBrain(e) {
+    var input = event.target;
+
+    var reader = new FileReader();
+    reader.onload = function(){
+        var buffer = reader.result;
+        var params = new Float64Array(buffer);
+        for (var i = 0; i <  window.gcd.world.agents.length; i++) {
+            window.gcd.world.agents[i].car.brain.import(params);
+            // window.gcd.world.agents[i].car.brain.learning = false;
+        }
+    };
+
+    reader.readAsArrayBuffer(input.files[0]);
+}
+
+window.infopanel = {
+    age: document.getElementById('agent-age')
+}
+
+function stats() {
+    var agent = window.gcd.world.agents[0];
+    window.infopanel.age.innerText = Math.floor(window.gcd.world.age) + '';
+}
+
 window.gcd = boot();
-window.downloadBrain = downloadBrain
+window.downloadBrain = downloadBrain;
+window.readBrain = readBrain;
+
+setInterval(stats, 100);

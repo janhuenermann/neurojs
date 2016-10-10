@@ -48,9 +48,9 @@
 
 	function boot() {
 	    this.world = new app.world();
-	    this.renderer = new app.renderer(this.world);
+	    this.renderer = new app.renderer(this.world, document.getElementById("container"));
 
-	    this.world.init(3);
+	    this.world.init(4);
 
 	    this.dispatcher = new app.dispatcher(this.renderer, this.world);
 	    this.dispatcher.begin();
@@ -80,12 +80,40 @@
 	}
 
 	function downloadBrain(n) {
-		var weights = window.gcd.world.agents[0].car.brain.export()
+		var weights = window.gcd.world.agents[n].car.brain.export()
 		saveAs(new DataView(weights.buffer))
 	}
 
+	function readBrain(e) {
+	    var input = event.target;
+
+	    var reader = new FileReader();
+	    reader.onload = function(){
+	        var buffer = reader.result;
+	        var params = new Float64Array(buffer);
+	        for (var i = 0; i <  window.gcd.world.agents.length; i++) {
+	            window.gcd.world.agents[i].car.brain.import(params);
+	            // window.gcd.world.agents[i].car.brain.learning = false;
+	        }
+	    };
+
+	    reader.readAsArrayBuffer(input.files[0]);
+	}
+
+	window.infopanel = {
+	    age: document.getElementById('agent-age')
+	}
+
+	function stats() {
+	    var agent = window.gcd.world.agents[0];
+	    window.infopanel.age.innerText = Math.floor(window.gcd.world.age) + '';
+	}
+
 	window.gcd = boot();
-	window.downloadBrain = downloadBrain
+	window.downloadBrain = downloadBrain;
+	window.readBrain = readBrain;
+
+	setInterval(stats, 100);
 
 /***/ },
 /* 1 */
@@ -106,8 +134,8 @@
 
 	var car = __webpack_require__(3);
 
-	function agent() {
-	    this.car = new car({});
+	function agent(world) {
+	    this.car = new car(world, {});
 	    this.init();
 	};
 
@@ -131,7 +159,7 @@
 	    sensors = __webpack_require__(5),
 	    tc = __webpack_require__(6);
 
-	function car(opt) {
+	function car(world, opt) {
 	    this.options = {
 	        sensors: [
 
@@ -163,14 +191,17 @@
 	        ]
 	    };
 
-	    this.maxSteer = opt.maxSteer || Math.PI / 5;
-	    this.maxEngineForce = opt.maxEngineForce || 4;
-	    this.maxBrakeForce = opt.maxBrakeForce || 5;
-	    this.maxBackwardForce = opt.maxBackwardForce || 2;
+	    this.maxSteer = Math.PI / 7;
+	    this.maxEngineForce = 10;
+	    this.maxBrakeForce = 5;
+	    this.maxBackwardForce = 2;
+	    this.linearDamping = 0.5;
 
 	    this.continuous = true
-	    this.frequency = 10
+	    this.frequency = 15
 	    this.discount = .75
+
+	    this.world = world
 
 	    this.init();
 	};
@@ -201,20 +232,22 @@
 	        var actions = 2
 	        var temporal = 1
 
-	        var input = states + (states + actions) * temporal
+	        var input = window.neurojs.Agent.getInputDimension(states, actions, temporal)
 
-	        if(!car.actor)
+	        if(!car.actor) {
 	            car.actor = new window.neurojs.Network.Model([
 
 	                { type: 'input', size: input },
-	                { type: 'fc', size: 60, activation: 'relu' },
-	                { type: 'fc', size: 60, activation: 'relu', dropout: 0.4 },
+	                { type: 'fc', size: 40, activation: 'relu' },
+	                { type: 'fc', size: 40, activation: 'relu' },
+	                { type: 'fc', size: 40, activation: 'relu', dropout: 0.5 },
 	                { type: 'fc', size: actions, activation: 'tanh' },
 	                { type: 'regression' }
 
 	            ])
+	        }
 
-	        if(!car.critic)
+	        if(!car.critic) {
 	            car.critic = new window.neurojs.Network.Model([
 
 	                { type: 'input', size: input + actions },
@@ -224,13 +257,22 @@
 	                { type: 'regression' }
 
 	            ]).newConfiguration()
+	            this.world.pool.critic = car.critic
+	        }
 
-	        var exp_size = 3600 * this.frequency // store one hour of memories
+	        if(!car.target) {
+	            car.target = car.critic.model.newConfiguration()
+	            this.world.pool.target = car.target
+	        }
+
+	        var exp_size = 5000 * this.frequency
 
 	        this.brain = new window.neurojs.Agent({
 
 	            actor: car.actor.newConfiguration(),
 	            critic: car.critic,
+
+	            targetCritic: car.target,
 
 	            states: states,
 	            actions: actions,
@@ -239,15 +281,19 @@
 
 	            temporalWindow: temporal, 
 
-	            discount: Math.pow(this.discount, 1.0 / this.frequency),
+	            discount: 0.98, // Math.pow(this.discount, 1.0 / this.frequency),
 
 	            experience: exp_size, 
-	            learningPerTick: Math.floor(640 / this.frequency), 
+	            learningPerTick: 50, 
+	            startLearningAt: 5000,
 
-	            theta: 0.01 / this.frequency,
+	            theta: 0.001,
+
+	            alpha: 0.1
 
 	        })
 
+	        // this.world.pool.add(this.brain)
 	        // window.neurojs.Loader.loadAgent('checkpoint/car-ddpg-1-age75000.bin', this.brain)
 
 	    }
@@ -257,7 +303,7 @@
 	        var actions = car.actions.length
 	        var temporal = 1
 
-	        var input = states + (states + actions) * temporal
+	        var input = window.neurojs.Agent.getInputDimension(states, actions, temporal)
 
 	        var net = new window.neurojs.Network.Model([
 
@@ -299,6 +345,7 @@
 	    this.wheels = {}
 	    this.chassisBody.color = color.randomPastelHex();
 	    this.chassisBody.car = true;
+	    this.chassisBody.damping = this.linearDamping;
 
 	    var boxShape = new p2.Box({ width: 0.5, height: 1 });
 	    boxShape.entity = 2
@@ -358,13 +405,13 @@
 	    this.frontWheel = this.vehicle.addWheel({
 	        localPosition: [0, 0.5] // front
 	    });
-	    this.frontWheel.setSideFriction(6);
+	    this.frontWheel.setSideFriction(50);
 
 	    // Back wheel
 	    this.backWheel = this.vehicle.addWheel({
 	        localPosition: [0, -0.5] // back
 	    });
-	    this.backWheel.setSideFriction(6); // Less side friction on back wheel makes it easier to drift
+	    this.backWheel.setSideFriction(45); // Less side friction on back wheel makes it easier to drift
 	};
 
 	car.prototype.update = function (dt) {
@@ -390,9 +437,13 @@
 	    if (this.timer >= 1.0 / this.frequency) {
 	        var d = this.updateSensors()
 
-	        this.brain.learn(
-	            Math.pow(this.chassisBody.velocity[1], 2) - 0.4 * Math.pow(this.chassisBody.velocity[0], 2) - this.punishment
-	        )
+	        var r = Math.pow(this.chassisBody.velocity[1], 2) - 0.4 * Math.pow(this.chassisBody.velocity[0], 2) - this.punishment
+
+	        if (Math.abs(this.speed.velocity) < 1e-2) { // punish no movement; it harms exploration
+	            r -= 1.0 
+	        }
+
+	        this.brain.learn(r)
 
 	        if (this.continuous) {
 	            this.action = this.brain.policy(d)
@@ -424,11 +475,11 @@
 	    }
 	};
 
-	car.prototype.addToWorld = function (world) {
-	    world.addBody(this.chassisBody);
-	    this.vehicle.addToWorld(world);
+	car.prototype.addToWorld = function () {
+	    this.world.p2.addBody(this.chassisBody);
+	    this.vehicle.addToWorld(this.world.p2);
 
-	   world.on("beginContact",(function(event){
+	   this.world.p2.on("beginContact",(function(event){
 	    if (event.bodyA === this.chassisBody || event.bodyB === this.chassisBody)
 	        this.punishment = 50; 
 	   }).bind(this));
@@ -484,8 +535,8 @@
 	        this.backWheel.engineForce = force
 	    }
 
-	    this.wheels.topLeft.rotation = this.frontWheel.steerValue * 0.5
-	    this.wheels.topRight.rotation = this.frontWheel.steerValue * 0.5
+	    this.wheels.topLeft.rotation = this.frontWheel.steerValue * 0.7071067812
+	    this.wheels.topRight.rotation = this.frontWheel.steerValue * 0.7071067812
 	};
 
 	module.exports = car;
@@ -601,12 +652,14 @@
 
 	function speedSensor(car, opt) {
 		this.car = car;
+		this.local = p2.vec2.create();
 	}
 
 	speedSensor.prototype.dimensions = 1
 
 	speedSensor.prototype.update = function () {
-		this.velocity = p2.vec2.len(this.car.chassisBody.velocity);
+		this.car.chassisBody.vectorToLocalFrame(this.local, this.car.chassisBody.velocity);
+		this.velocity = p2.vec2.len(this.car.chassisBody.velocity) * (this.local[1] > 0 ? 1.0 : -1.0);
 	};
 
 	speedSensor.prototype.draw = function (g) {
@@ -617,6 +670,7 @@
 		}
 
 		g.__label.text = Math.floor(this.velocity * 3.6) + ' km/h';
+		g.__label.rotation = -this.car.chassisBody.interpolatedAngle;
 	};
 
 	speedSensor.prototype.read = function () {
@@ -1902,12 +1956,7 @@
 	        requestAnimFrame(this.__loop);
 	    }
 
-	    var dt;
-
-	    if (!this.interval)
-	        dt = this.dt();
-	    else 
-	        dt = 1.0 / 60.0
+	    var dt = 1.0 / 60.0
 
 	    // compute phyiscs
 	    this.world.step(dt);
@@ -2036,22 +2085,31 @@
 	        this.add_body(e.body);
 	    }).bind(this));
 
-	    container = container || document.body
+	    if (container) {
+	        this.elementContainer = container
+	    }
 
-	    this.elementContainer = document.createElement("div");
-	    this.elementContainer.style.width = "100%";
-	    this.elementContainer.style.height = "100%";
-	    container.appendChild(this.elementContainer);
+	    else {
+	        this.elementContainer = document.createElement("div");
+	        this.elementContainer.style.width = "100%";
+	        // this.elementContainer.style.height = "100%";
+	        document.body.appendChild(this.elementContainer)
+	    }
 
 	    this.pixelRatio = window.devicePixelRatio || 1;
 
 	    this.pixi = new PIXI.autoDetectRenderer(0, 0, {
 	        antialias: true,
-	        resolution: this.pixelRatio
+	        resolution: this.pixelRatio,
+	        transparent: true
 	    }, false);
-	    this.pixi.backgroundColor = 0xFFFFFF;
+	    // this.pixi.backgroundColor = 0xFFFFFF;
 
-	    this.stage = new PIXI.Container();
+	    this.stage = new PIXI.Container()
+	    this.container = new PIXI.DisplayObjectContainer()
+
+	    this.stage.addChild(this.container)
+
 	    this.drawPoints = []
 
 	    this.elementContainer.addEventListener("mousedown", (function (e) {
@@ -2081,7 +2139,7 @@
 	    this.adjustBounds();
 
 	    this.drawingGraphic = new PIXI.Graphics()
-	    this.stage.addChild(this.drawingGraphic)
+	    this.container.addChild(this.drawingGraphic)
 	};
 
 	renderer.prototype.events = {};
@@ -2099,11 +2157,20 @@
 
 
 	renderer.prototype.adjustBounds = function () {
-	    var rect = this.elementContainer.getBoundingClientRect();
-	    this.viewport.width = rect.width;
-	    this.viewport.height = rect.height;
+	    var outerW = this.elementContainer.offsetWidth
+	    var outerH = outerW / 3 * 2
 
-	    this.pixi.resize(this.viewport.width, this.viewport.height);
+	    this.viewport.width = outerW
+	    this.viewport.height = outerH
+	    this.viewport.scale = outerW / 1200 * 35
+
+	    this.offset = this.pixi.view.getBoundingClientRect()
+	    this.offset = {
+	        top: this.offset.top + document.body.scrollTop,
+	        left: this.offset.left + document.body.scrollLeft
+	    }
+
+	    this.pixi.resize(this.viewport.width, this.viewport.height)
 	 };
 
 	renderer.prototype.render = function () {
@@ -2302,10 +2369,14 @@
 	        gravity : [0,0]
 	    });
 
-	    this.p2.solver.tolerance = 1.0
-	    this.p2.solver.iterations = 20
-	    this.p2.setGlobalStiffness(1e6)
-	    this.p2.setGlobalRelaxation(10)
+	    this.p2.solver.tolerance = 0.4
+	    this.p2.solver.iterations = 10
+	    this.p2.setGlobalStiffness(4000)
+	    this.p2.setGlobalRelaxation(8)
+
+	    this.age = 0.0
+
+	    this.pool = new window.neurojs.MultiAgentPool()
 	}
 
 	world.prototype.addWall = function (start, end, width) {
@@ -2351,10 +2422,9 @@
 
 	world.prototype.init = function (n) {
 	    for (var i = 0; i < n; i++) {
-	        var ag = new agent();
-
+	        var ag = new agent(this);
+	        ag.car.addToWorld();
 	        this.agents.push(ag);
-	        ag.car.addToWorld(this.p2);
 	    }
 
 	    this.addWall( [ -16.571428571428573, -10.671428571428573 ], [ -16.571428571428573, 10.671428571428573 ], 0.5 )
@@ -2364,14 +2434,14 @@
 	};
 
 	world.prototype.step = function (dt) {
-	    if (dt >= 0.02) 
-	        dt = 0.02;
+	    if (dt >= 0.02)  dt = 0.02;
 
 	    for (var i = 0; i < this.agents.length; i++) {
 	        this.agents[i].step(dt);
 	    }
 
 	    this.p2.step(1 / 60, dt, 10);
+	    this.age += dt
 	};
 
 	module.exports = world;

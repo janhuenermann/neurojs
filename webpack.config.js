@@ -4,9 +4,9 @@ module.exports = {
         path: __dirname,
         filename: "build/neurojs-v2.js"
     },
-    module: {
-  loaders: [
-    { test: /\.js$/, exclude: /node_modules/, loader: "babel-loader" }
-  ]
-}
+//     module: {
+//   loaders: [
+//     { test: /\.js$/, exclude: /node_modules/, loader: "babel-loader" }
+//   ]
+// }
 };

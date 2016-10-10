@@ -46,42 +46,42 @@
 
 	"use strict";
 
-	__webpack_require__(1);
+	__webpack_require__(1)
 
 	var neurojs = {
 
 		Network: __webpack_require__(2),
 		Agent: __webpack_require__(27),
 		Optim: __webpack_require__(12),
-		Loader: __webpack_require__(33)
+		Loader: __webpack_require__(33),
+		Buffers: __webpack_require__(30),
+		MultiAgentPool: __webpack_require__(34)
 
-	};
+	}
 
 	if (typeof window !== 'undefined') {
-		window.neurojs = neurojs;
+		window.neurojs = neurojs
 	} else {
-		module.exports = neurojs;
+		module.exports = neurojs
 	}
+
 
 /***/ },
 /* 1 */
 /***/ function(module, exports) {
 
-	if (Float64Array.prototype.fill === undefined) Float64Array.prototype.fill = function (v) {
-	    for (var i = 0; i < this.length; i++) {
-	        this[i] = v;
-	    }
-	};
+	if (Float64Array.prototype.fill === undefined)
+	    Float64Array.prototype.fill = function (v) {
+	        for (var i = 0; i < this.length; i++) { this[i] = v; }
+	    };
+
 
 	Object.assign(Math, {
 
 	    statistics: true,
 
 	    randn() {
-	        var U1,
-	            U2 = this.randn.U2,
-	            W,
-	            mult;
+	        var U1, U2 = this.randn.U2, W, mult;
 	        if (U2) {
 	            this.randn.U2 = null; // deactivate for next time
 	            return U2;
@@ -104,130 +104,124 @@
 	    },
 
 	    randi(a, b) {
-	        return a + Math.floor(Math.random() * (b - a));
+	        return a + Math.floor(Math.random() * (b - a))
 	    },
 
 	    uhlenbeckOrnstein(old, theta, sigma, dt) {
-	        return old - theta * old * dt + Math.sqrt(dt) * Math.randn(0.0, sigma);
+	       return old - theta * old * dt + Math.sqrt(dt) * Math.randn(0.0, sigma)
 	    }
 
-	});
+	})
 
 	Object.assign(Array, {
 
 	    random(arr) {
-	        return arr[Math.floor(Math.random() * arr.length)];
+	        return arr[Math.floor(Math.random() * arr.length)]
 	    },
 
 	    randomAndRemove() {
-	        var index = Math.floor(Math.random() * this.length);
-	        var value = this[index];
-	        this.splice(index, 1);
+	        var index = Math.floor(Math.random() * this.length)
+	        var value = this[index]
+	        this.splice(index, 1)
 
-	        return value;
+	        return value
 	    },
 
 	    sum(arr, valueFunc) {
 	        valueFunc = valueFunc || (x => x);
-	        var sum = 0.0;
+	        var sum = 0.0
 	        for (var i = 0; i < arr.length; i++) {
-	            sum += valueFunc(arr[i]);
+	            sum += valueFunc(arr[i])
 	        }
 
-	        return sum;
+	        return sum
 	    },
 
 	    lowest(valueFunc) {
-	        return this.reduce((a, b) => valueFunc(a) < valueFunc(b) ? a : b);
+	        return this.reduce((a, b) => valueFunc(a) < valueFunc(b) ? a : b)
 	    },
 
 	    highest(valueFunc) {
-	        return this.reduce((a, b) => valueFunc(a) > valueFunc(b) ? a : b);
+	        return this.reduce((a, b) => valueFunc(a) > valueFunc(b) ? a : b)
 	    },
 
 	    sample(probFunc) {
-	        var des = Math.random();
-	        var pos = 0.0;
+	        var des = Math.random()
+	        var pos = 0.0
 	        for (var i = 0; i < this.children.length; i++) {
-	            if (des < (pos += prob[i])) return this.children[i];
+	            if (des < (pos += prob[i]))
+	                return this.children[i]
 	        }
 
-	        return this.children[this.children.length - 1];
+	        return this.children[this.children.length - 1]
 	    }
 
-	});
+	})
+
 
 	Object.assign(Float64Array, {
 
 	    filled(n, v) {
-	        return new Float64Array(n).fill(v);
+	        return (new Float64Array(n)).fill(v)
 	    },
 
 	    oneHot(n, N) {
-	        var vec = new Float64Array(N);
-	        vec[n] = 1.0;
-	        return vec;
+	        var vec = new Float64Array(N)
+	        vec[n] = 1.0
+	        return vec
 	    },
 
 	    noise(N, a, b) {
-	        var vec = new Float64Array(N);
-	        vec.randf(a || -1, b || 1);
-	        return vec;
+	        var vec = new Float64Array(N)
+	        vec.randf(a || -1, b || 1)
+	        return vec
 	    }
 
 	});
+
 
 	Object.assign(Float64Array.prototype, {
 
 	    randn(mu, std) {
-	        for (var i = 0; i < this.length; i++) {
-	            this[i] = mu + std * Math.randn();
-	        }
+	        for (var i = 0; i < this.length; i++) { this[i] = mu + std * Math.randn(); }
 	    },
 
-	    randf(a, b) {
-	        for (var i = 0; i < this.length; i++) {
-	            this[i] = Math.randf(a, b);
-	        }
+	    randf(a, b) { 
+	        for (var i = 0; i < this.length; i++) { this[i] = Math.randf(a, b); }
 	    },
 
 	    maxi() {
-	        var maxv = -Infinity,
-	            maxi = 0.0;
+	        var maxv = -Infinity, maxi = 0.0
 	        for (var i = 0; i < this.length; i++) {
 	            if (this[i] > maxv) {
-	                maxv = this[i];maxi = i;
+	                maxv = this[i]; maxi = i
 	            }
 	        }
 
-	        return maxi;
+	        return maxi
 	    },
 
 	    clone() {
-	        var copied = new Float64Array(this.length);
-	        copied.set(this);
-	        return copied;
+	        var copied = new Float64Array(this.length)
+	        copied.set(this)
+	        return copied
 	    },
 
 	    diff(x, y) {
-	        for (var i = 0; i < this.length; i++) {
-	            this[i] = x[i] - y[i];
-	        }
+	        for (var i = 0; i < this.length; i++) { this[i] = x[i] - y[i] }
 	    },
 
 	    add(x, y) {
-	        for (var i = 0; i < this.length; i++) {
-	            this[i] = x[i] + y[i];
-	        }
+	        for (var i = 0; i < this.length; i++) { this[i] = x[i] + y[i] }
 	    },
 
 	    mult(x, y) {
-	        for (var i = 0; i < this.length; i++) {
-	            this[i] = x[i] * y;
-	        }
+	        for (var i = 0; i < this.length; i++) { this[i] = x[i] * y }
 	    }
 
 	});
+
+
 
 /***/ },
 /* 2 */
@@ -241,7 +235,7 @@
 	var input = __webpack_require__(7);
 	var regression = __webpack_require__(8);
 	var noise = __webpack_require__(9);
-	var bayesian = __webpack_require__(10);
+	var bayesian = __webpack_require__(10)
 
 	var Size = __webpack_require__(4);
 	var Tensor = __webpack_require__(11);
@@ -255,170 +249,169 @@
 	class Model {
 
 		constructor(opt) {
-			this.build(opt);
+			this.build(opt)
 		}
 
 		build(opt) {
-			this.layers = [];
+			this.layers = []
 
-			var input = null;
-			var desc = Model.expand(opt);
+			var input = null
+			var desc = Model.expand(opt)
 
-			for (var i = 0; i < desc.length; i++) {
-				var current = desc[i];
-				var layer = Model.create(input, current);
+			for(var i = 0; i < desc.length; i++) {
+				var current = desc[i]
+				var layer = Model.create(input, current)
 
-				layer.label = current.label || undefined;
-				layer.index = i;
-				layer.model = this;
-				layer.options = current;
+				layer.label = current.label || undefined
+				layer.index = i
+				layer.model = this
+				layer.options = current
 
-				if (layer.dimensions.output) layer.size = layer.dimensions.output.length; // convenience
+				if (layer.dimensions.output)
+					layer.size = layer.dimensions.output.length // convenience
 
-				this.layers.push(layer);
-				input = layer.dimensions.output;
+				this.layers.push(layer)
+				input = layer.dimensions.output
 			}
 
-			this.input = this.layers[0];
-			this.output = this.layers[this.layers.length - 1];
+			this.input = this.layers[0]
+			this.output = this.layers[this.layers.length - 1]
 		}
 
 		newConfiguration() {
-			return new Configuration(this);
+			return new Configuration(this)
 		}
 
 		newState() {
-			return this.newConfiguration().newState();
+			return this.newConfiguration().newState()
 		}
 
 		numericalGradientCheck() {
-			var config = this.newConfiguration();
-			var state = config.newState();
-			var diff = 1e-5;
+			var config = this.newConfiguration()
+			var state = config.newState()
+			var diff = 1e-5
 
 			function clear() {
 				// clear gradients
 				for (var i = 0; i < config.parameters.length; i++) {
-					if (config.parameters[i]) config.parameters[i].dw.fill(0.0);
+					if (config.parameters[i]) 
+						config.parameters[i].dw.fill(0.0)
 				}
 			}
 
 			function analyse(param, index) {
-				clear.call(this);
+				clear.call(this)
 
-				state.forward(input);
-				state.backward(output);
+				state.forward(input)
+				state.backward(output)
 
-				return config.parameters[param].dw[index];
+				return config.parameters[param].dw[index]
 			}
 
 			function loss() {
-				state.forward(input);
-				return state.loss(output);
+				state.forward(input)
+				return state.loss(output)
 			}
 
 			function measure(param, index) {
-				var orig = config.parameters[param].w[index];
-				config.parameters[param].w[index] = orig - diff;
-				var loss1 = loss.call(this);
-				config.parameters[param].w[index] = orig + diff;
-				var loss2 = loss.call(this);
-				config.parameters[param].w[index] = orig;
+				var orig = config.parameters[param].w[index]
+				config.parameters[param].w[index] = orig - diff
+				var loss1 = loss.call(this)
+				config.parameters[param].w[index] = orig + diff
+				var loss2 = loss.call(this)
+				config.parameters[param].w[index] = orig
 
-				return (loss2 - loss1) / (2 * diff);
+				return (loss2 - loss1) / (2 * diff)
 			}
 
 			function checkWeight(param, index) {
-				var analytical = analyse.call(this, param, index);
-				var numerical = measure.call(this, param, index);
-				var divisor = Math.abs(analytical);
+				var analytical = analyse.call(this, param, index)
+				var numerical = measure.call(this, param, index)
+				var divisor = Math.abs(analytical)
 
-				return Math.abs(numerical - analytical) / (divisor !== 0 ? divisor : 1);
+				return Math.abs(numerical - analytical) / (divisor !== 0 ? divisor : 1)
 			}
 
-			var input = Float64Array.filled(this.input.size, 1.0);
-			var output = Float64Array.filled(this.output.size, 1.0);
 
-			console.log('Checking analytical gradients...'.magenta);
+			var input = Float64Array.filled(this.input.size, 1.0)
+			var output = Float64Array.filled(this.output.size, 1.0)
 
-			var total = 0.0;
+			console.log('Checking analytical gradients...'.magenta)
+
+			var total = 0.0
 			for (var i = config.parameters.length - 1; i >= 0; i--) {
-				var param = config.parameters[i];
-				if (param === undefined) continue;
+				var param = config.parameters[i]
+				if (param === undefined)
+					continue 
 
-				var offset = 0.0;
+				var offset = 0.0
 				for (var j = 0; j < param.w.length; j++) {
-					var error = checkWeight.call(this, i, j);
+					var error = checkWeight.call(this, i, j)
 					if (isNaN(error)) {
-						console.log('Layer ' + i);
-						throw 'gradient is NaN';
+						console.log('Layer ' + i)
+						throw 'gradient is NaN'
 					}
 
-					offset += error * error;
+					offset += error * error
 				}
 
-				total += offset;
-				offset = Math.sqrt(offset) / param.w.length;
+				total += offset
+				offset = Math.sqrt(offset) / param.w.length
 
-				console.log('Layer ' + i + ' with gradient error of ' + offset);
+				console.log('Layer ' + i + ' with gradient error of ' + offset)
 
-				if (offset > 1e-3) {
-					throw 'analytical gradient unusually faulty';
+				if (offset > 1e-3)  {
+					throw 'analytical gradient unusually faulty'
 				}
 			}
 
-			total = Math.sqrt(total) / config.countOfParameters;
+			total = Math.sqrt(total) / config.countOfParameters
 
-			console.log(('Mean gradient error is ' + total).bold.cyan);
-			console.log('Gradients are looking good!'.bold.white);
+			console.log(('Mean gradient error is ' + total).bold.cyan)
+			console.log('Gradients are looking good!'.bold.white)
 		}
 
+
 		static expand(opt) {
-			var description = [];
+			var description = []
 			for (var i = 0; i < opt.length; i++) {
-				var current = opt[i];
+				var current = opt[i]
 
-				if (current.type === 'softmax' && current.classes) description.push({ type: 'fc', size: current.classes });
+				if (current.type === 'softmax' && current.classes)
+					description.push({ type: 'fc', size: current.classes })
 
-				description.push(current);
+				description.push(current)
 
-				if (current.activation) description.push({ type: current.activation });
+				if (current.activation)
+					description.push({ type: current.activation })
 
-				if (current.dropout) description.push({ type: 'dropout', probability: current.dropout });
+				if (current.dropout)
+					description.push({ type: 'dropout', probability: current.dropout })
 			}
 
-			if (!['softmax', 'regression'].includes(description[description.length - 1].type)) description.push({ type: 'regression' });
+			if (![ 'softmax', 'regression' ].includes(description[description.length - 1].type))
+				description.push({ type: 'regression' })
 
-			return description;
+			return description
 		}
 
 		static create(inp, opt) {
 			switch (opt.type) {
-				case 'fc':
-					return new dot.FullyConnectedLayer(inp, opt);
-				case 'fc-sa':
-					return new dot.FullyConnectedLayerSelfAware(inp, opt);
-				case 'dropout':
-					return new dropout.DropOutLayer(inp, opt);
-				case 'sigmoid':
-					return new nonlinear.SigmoidLayer(inp, opt);
-				case 'tanh':
-					return new nonlinear.TanhLayer(inp, opt);
-				case 'relu':
-					return new nonlinear.ReLuLayer(inp, opt);
-				case 'input':
-					return new input.InputLayer(inp, opt);
-				case 'regression':
-					return new regression.RegressionLayer(inp, opt);
-				case 'softmax':
-					return new regression.SoftmaxLayer(inp, opt);
-				case 'noise':
-					return new noise.UhlenbeckOrnsteinNoiseLayer(inp, opt);
-				case 'bayesian':
-					return new bayesian.VariationalBayesianLayer(inp, opt);
+				case 'fc': return new dot.FullyConnectedLayer(inp, opt)
+				case 'fc-sa': return new dot.FullyConnectedLayerSelfAware(inp, opt)
+				case 'dropout': return new dropout.DropOutLayer(inp, opt)
+				case 'sigmoid': return new nonlinear.SigmoidLayer(inp, opt)
+				case 'tanh': return new nonlinear.TanhLayer(inp, opt)
+				case 'relu': return new nonlinear.ReLuLayer(inp, opt)
+				case 'input': return new input.InputLayer(inp, opt)
+				case 'regression': return new regression.RegressionLayer(inp, opt)
+				case 'softmax': return new regression.SoftmaxLayer(inp, opt)
+				case 'noise': return new noise.UhlenbeckOrnsteinNoiseLayer(inp, opt)
+				case 'bayesian': return new bayesian.VariationalBayesianLayer(inp, opt)
+				case 'conf': return new bayesian.ConfidenceLayer(inp, opt)
 			}
 
-			throw 'error';
+			throw 'error'
 		}
 
 	}
@@ -427,98 +420,117 @@
 	class Configuration {
 
 		constructor(model, parameters) {
-			this.model = model;
-			this.parameters = [];
-			this.optimizer = null;
-			this.countOfParameters = 0;
+			this.model = model
+			this.parameters = []
+			this.optimizer = null
+			this.countOfParameters = 0  
 
 			for (var i = 0; i < this.model.layers.length; i++) {
-				var layer = this.model.layers[i];
+				var layer = this.model.layers[i]
 				if (!layer.dimensions.parameters) {
-					continue;
+					continue 
 				}
 
-				var param = this.parameters[i] = new Tensor(layer.dimensions.parameters);
+				var param = this.parameters[i] = new Tensor(layer.dimensions.parameters)
 				if (parameters && parameters.length === this.model.layers.length) // copy from
-					param.w.set(parameters[i].w);else if (layer.initialize) // initialize as new parameters
-					layer.initialize(param);else // random parameters
-					param.w.randf(-1, 1);
+					param.w.set(parameters[i].w)
+				else if (layer.initialize) // initialize as new parameters
+					layer.initialize(param)
+				else  // random parameters
+					param.w.randf(-1, 1)
 
-				this.countOfParameters += layer.dimensions.parameters;
+				this.countOfParameters += layer.dimensions.parameters
 			}
+
 		}
 
+
 		useOptimizer(optimizer) {
-			if (optimizer.constructor === Object) optimizer = new Optim(optimizer);
+			if (optimizer.constructor === Object)
+				optimizer = new Optim(optimizer)
 
-			this.optimizer = optimizer;
-			this.forEachParameter(param => optimizer.initialize(param));
+			this.optimizer = optimizer
+			this.forEachParameter(param => optimizer.initialize(param))
 
-			return optimizer;
+			return optimizer
+		}
+
+		freeze(val = true) {
+			this.freezed = val
 		}
 
 		optimize(accu) {
-			if (accu !== false) this.accumulate(Number.isInteger(accu) ? accu : undefined);
-			this.forEachParameter(param => this.optimizer.apply(param));
+			if (accu !== false) this.accumulate(Number.isInteger(accu) ? accu : undefined)
+			this.forEachParameter(param => this.optimizer.apply(param))
+		}
+		
+		accumulate(weighted) {
+			this.forEachParameter(param => this.optimizer.accumulate(param, weighted))
 		}
 
-		accumulate(weighted) {
-			this.forEachParameter(param => this.optimizer.accumulate(param, weighted));
-		}
+
 
 		forEachParameter(cb) {
-			for (var i = 0; i < this.parameters.length; i++) {
-				var param = this.parameters[i];
-				if (param === undefined) continue;
+			if (this.freezed) return
+			for (var i = 0; i < this.parameters.length; i++) { 
+				var param = this.parameters[i]
+				if (param === undefined) 
+					continue
 
-				cb(param, i);
+				cb(param, i)
 			}
 		}
 
 		copyParametersFrom(config) {
-			if (config.model !== this.model) throw 'models must match';
+			if (config.model !== this.model)
+				throw 'models must match'
 
-			this.forEachParameter(function (param, index) {
-				param.w.set(config.parameters[index].w);
-			}.bind(this));
+			this.forEachParameter((function (param, index) {
+				param.w.set(config.parameters[index].w)
+			}).bind(this))
 		}
 
+
 		newState() {
-			return new State(this);
+			return new State(this)
 		}
 
 		duplicate() {
-			return new Configuration(this.model, this.optimizer, this.parameters);
+			return new Configuration(this.model, this.optimizer, this.parameters)
 		}
 
+
 		read(arr) {
-			var joined = arr;
+			var joined = arr
 
-			if (arr.length !== this.countOfParameters) throw 'array doesnt match';
+			if (arr.length !== this.countOfParameters)
+				throw 'array doesnt match'
 
-			for (var i = 0, p = 0; i < this.parameters.length; i++) {
-				var param = this.parameters[i];
-				if (param === undefined) continue;
+			for (var i = 0, p = 0; i < this.parameters.length; i++) { 
+				var param = this.parameters[i]
+				if (param === undefined) 
+					continue
 
-				param.w.set(joined.subarray(p, p + param.w.length));
+				param.w.set(joined.subarray(p, p + param.w.length))
 
-				p += param.w.length;
+				p += param.w.length
 			}
 		}
 
 		write() {
-			var joined = new Float64Array(this.countOfParameters);
+			var joined = new Float64Array(this.countOfParameters)
 
-			for (var i = 0, p = 0; i < this.parameters.length; i++) {
-				var param = this.parameters[i];
-				if (param === undefined) continue;
+			for (var i = 0, p = 0; i < this.parameters.length; i++) { 
+				var param = this.parameters[i]
+				if (param === undefined) 
+					continue
 
-				joined.set(param.w, p);
+				joined.set(param.w, p)
 
-				p += param.w.length;
+				p += param.w.length
 			}
 
-			return joined;
+			return joined
 		}
 
 	}
@@ -527,122 +539,142 @@
 	class State {
 
 		constructor(configuration) {
-			this.configuration = configuration;
-			this.model = this.configuration.model;
-			this.layers = this.model.layers;
+			this.configuration = configuration
+			this.model = this.configuration.model
+			this.layers = this.model.layers
 
-			this.tensors = []; // array of layer tensors; this.tensors[i] = output tensor of layer i
-			this.contexts = [];
+			this.tensors = [] // array of layer tensors; this.tensors[i] = output tensor of layer i
+			this.contexts = [] 
 
 			// First input + output of every layer
 			for (var i = 0; i < this.layers.length + 1; i++) {
 				if (i > 0 && this.layers[i - 1].passthrough) // if passthrough, just use last tensor
-					this.tensors[i] = this.tensors[i - 1];else // if at i = layers.length, then use output of last layer as tensor size
-					this.tensors[i] = new Tensor(i < this.layers.length ? this.layers[i].dimensions.input : this.layers[i - 1].dimensions.output);
+					this.tensors[i] = this.tensors[i - 1]
+				else // if at i = layers.length, then use output of last layer as tensor size
+					this.tensors[i] = new Tensor(i < this.layers.length ? this.layers[i].dimensions.input : this.layers[i - 1].dimensions.output)
 			}
-
+			
 			for (var i = 0; i < this.layers.length; i++) {
-				var layer = this.layers[i];
+				var layer = this.layers[i]
 				var context = this.contexts[i] = new LayerContext({
 					input: this.tensors[i],
 					output: this.tensors[i + 1],
 					parameters: this.configuration.parameters[i],
 					state: this
-				});
+				})
 
 				Object.each(layer.storage || {}, function (k, v) {
 					context[k] = new Float64Array(!isNaN(v) ? v : v.length);
-				});
+				})
 			}
+	 
+			this.in = this.tensors[0]
+			this.out = this.tensors[this.layers.length]
 
-			this.in = this.tensors[0];
-			this.out = this.tensors[this.layers.length];
-
-			this.__target = new Float64Array(this.out.w.length);
-			this.__l_in = this.layers[0];
-			this.__l_out = this.layers[this.layers.length - 1];
+			this.__target = new Float64Array(this.out.w.length)
+			this.__l_in = this.layers[0]
+			this.__l_out = this.layers[this.layers.length - 1]
 		}
 
 		/**
-	  * Evaluate network
-	  * @param  {Float64Array} input
-	  * @return {Float64Array} 
-	  */
+		 * Evaluate network
+		 * @param  {Float64Array} input
+		 * @return {Float64Array} 
+		 */
 		forward(input, opt) {
 			if (input != null) {
-				this.__l_in.toInputVector(input, this.in.w); // use 'input' as input values, while converting it to a vector
+				this.__l_in.toInputVector(input, this.in.w) // use 'input' as input values, while converting it to a vector
 			}
 
-			this.options = opt || {}; // set pass options
-			this.activate(); // activate all layers
+			this.options = opt || {} // set pass options
+			this.activate() // activate all layers
 
-			return this.output; // return copy of output
+			return this.output // return copy of output
 		}
 
 		/**
-	  * Propagates error back, error is provided by subtracting desired from actual output values. 
-	  * @param  {Float64Array | Int} desired
-	  * @return {Float}         loss
-	  */
+		 * Propagates error back, error is provided by subtracting desired from actual output values. 
+		 * @param  {Float64Array | Int} desired
+		 * @return {Float}         loss
+		 */
 		backward(desired) {
 			if (desired != null) {
-				this.__l_out.toGradientVector(desired, this.out.w, this.out.dw); // convert 'desired' to target vector
+				this.__l_out.toGradientVector(desired, this.out.w, this.out.dw) // convert 'desired' to target vector
 			}
+			
+			this.propagate() // propagate errors backwards
 
-			this.propagate(); // propagate errors backwards
-
-			return this.loss(desired); // return loss
+			return this.loss(desired) // return loss
 		}
 
 		/**
-	  * Instead of regressing the network to have minimal error, you can provide your own gradient.
-	  * @param  {Float64Array} grad
-	  */
+		 * Instead of regressing the network to have minimal error, you can provide your own gradient.
+		 * @param  {Float64Array} grad
+		 */
 		backwardWithGradient(grad) {
-			if (!isNaN(grad) && this.out.dw.length === 1) this.out.dw[0] = grad;else this.out.dw.set(grad);
+			if (Array.isArray(grad))
+				this.out.dw.set(grad)
+			else if (this.out.dw.length === 1)
+				this.out.dw[0] = grad
+			else
+				throw 'error grad not propagatable';
 
-			this.propagate();
+			this.propagate()
 		}
+
 
 		// get copy of current output
 		get output() {
-			return this.__l_out.result(this.contexts[this.__l_out.index]);
+			return this.__l_out.result(this.contexts[this.__l_out.index])
 		}
 
 		// get loss of current 
 		loss(desired) {
-			if (desired === undefined) return;
+			if (desired === undefined)
+				return 
 
-			return this.__l_out.loss(this.contexts[this.__l_out.index], desired);
+			return this.__l_out.loss(this.contexts[this.__l_out.index], desired)
 		}
+
 
 		// not error gradient, but value gradient => how to increase/decrease n-th output value
 		derivatives(n, clone = true) {
-			this.out.dw.fill(0.0);
-			this.out.dw[n] = 1.0;
+			this.out.dw.fill(0.0)
+			this.out.dw[n] = 1.0
 
-			this.propagate();
+			this.propagate()
 
-			if (clone) return this.in.dw.clone();
+			if (clone)
+				return this.in.dw.clone()
 
-			return this.in.dw;
+			return this.in.dw
 		}
+
 
 		// forward pass
 		activate() {
 			for (var i = 0; i < this.layers.length; i++) {
-				if (this.layers[i].passthrough) continue;
+				if (this.layers[i].passthrough) 
+					continue ;
 
-				this.layers[i].forward(this.contexts[i]);
+				this.layers[i].forward(this.contexts[i])
 			}
 		}
 
 		// backwards pass
 		propagate() {
-			for (var i = this.layers.length - 1; i >= 0; i--) {
-				if (this.layers[i].passthrough) continue;
+			// safety check
+			for (var i = 0; i < this.out.dw.length; i++) {
+				if (isNaN(this.out.dw[i])) {
+					throw 'warning: terror!';
+				}
+			}
 
-				this.layers[i].backward(this.contexts[i]);
+			for (var i = this.layers.length - 1; i >= 0; i--) {
+				if (this.layers[i].passthrough) 
+					continue ;
+
+				this.layers[i].backward(this.contexts[i])
 			}
 		}
 
@@ -651,13 +683,14 @@
 	class LayerContext {
 
 		constructor(opt) {
-			this.input = opt.input;
-			this.output = opt.output;
-			this.params = opt.parameters;
-			this.state = opt.state;
+			this.input = opt.input
+			this.output = opt.output
+			this.params = opt.parameters
+			this.state = opt.state
 		}
 
 	}
+
 
 	module.exports = {
 		Model, Configuration, State
@@ -674,78 +707,71 @@
 	class FullyConnectedLayer {
 
 		constructor(input, opt) {
-			opt.size = Size.derive(opt.size);
+			opt.size = Size.derive(opt.size)
 
 			this.dimensions = {
 				input,
 				output: opt.size,
 				parameters: input.length * opt.size.length + opt.size.length
-			};
+			}
 		}
 
 		forward(ctx) {
-			var sum = 0.0,
-			    X = this.dimensions.input.length,
-			    Y = this.dimensions.output.length;
-			var inpw = ctx.input.w,
-			    outw = ctx.output.w,
-			    paramw = ctx.params.w;
+			var sum = 0.0, X = this.dimensions.input.length, Y = this.dimensions.output.length
+			var inpw = ctx.input.w, outw = ctx.output.w, paramw = ctx.params.w
 
 			for (var i = 0; i < Y; i++) {
-				sum = 0.0;
+				sum = 0.0
 				for (var j = 0; j < X; j++) {
-					sum += inpw[j] * paramw[i * X + j];
+					sum += inpw[j] * paramw[i * X + j]
 				}
 
-				outw[i] = sum + paramw[X * Y + i];
+				outw[i] = sum + paramw[X * Y + i]
 			}
 		}
 
 		backward(ctx) {
-			var sum = 0.0,
-			    X = this.dimensions.input.length,
-			    Y = this.dimensions.output.length;
-			var inpw = ctx.input.w,
-			    outw = ctx.output.w,
-			    paramw = ctx.params.w;
-			var inpdw = ctx.input.dw,
-			    outdw = ctx.output.dw,
-			    paramdw = ctx.params.dw;
+			var sum = 0.0, X = this.dimensions.input.length, Y = this.dimensions.output.length
+			var inpw = ctx.input.w, outw = ctx.output.w, paramw = ctx.params.w
+			var inpdw = ctx.input.dw, outdw = ctx.output.dw, paramdw = ctx.params.dw
 
 			for (var i = 0; i < X; i++) {
-				sum = 0.0;
+				sum = 0.0
 				for (var j = 0; j < Y; j++) {
-					sum += paramw[j * X + i] * outdw[j];
-					paramdw[j * X + i] = inpw[i] * outdw[j];
+					sum += paramw[j * X + i] * outdw[j]
+					paramdw[j * X + i] = inpw[i] * outdw[j]
 				}
 
-				inpdw[i] = sum;
+				inpdw[i] = sum
 			}
 
 			for (var i = 0; i < Y; i++) {
-				paramdw[X * Y + i] = outdw[i];
+				paramdw[X * Y + i] = outdw[i]
 			}
 		}
 
 		initialize(params) {
 			if (this.options.init) {
-				params.w.randf(this.options.init[0], this.options.init[1]);
-				return;
+				params.w.randf(this.options.init[0], this.options.init[1])
+				return 
 			}
 
-			var X = this.dimensions.input.length,
-			    Y = this.dimensions.output.length;
-			var dropout = this.options.dropout || 0;
-			var elements = (1 - dropout) * (this.dimensions.input.length + this.dimensions.output.length);
-			var scale = Math.sqrt(2.0 / elements);
-			params.w.randn(0.0, scale);
+			var X = this.dimensions.input.length, Y = this.dimensions.output.length
+			var dropout = this.options.dropout || 0
+			var elements = (1 - dropout) * (this.dimensions.input.length + this.dimensions.output.length)
+			var scale = Math.sqrt(2.0 / elements)
+			params.w.randn(0.0, scale)
+
+			if (this.options.customInit) {
+				this.options.customInit(params.w);
+			}
 		}
 
 	}
 
 	module.exports = {
 		FullyConnectedLayer
-	};
+	}
 
 /***/ },
 /* 4 */
@@ -754,9 +780,11 @@
 	module.exports = class Size {
 
 		static derive(val) {
-			if (val instanceof Size) return val;
+			if (val instanceof Size)
+				return val;
 
-			if (Number.isInteger(val)) return new Size(1, 1, val);
+			if (Number.isInteger(val))
+				return new Size(1, 1, val);
 
 			throw "could not derive size";
 		}
@@ -769,16 +797,19 @@
 		}
 
 		get dimensions() {
-			if (this.x * this.y * this.z === 0) return 0;
+			if (this.x * this.y * this.z === 0)
+				return 0
 
-			if (this.x * this.y === 1) return 1;
+			if (this.x * this.y === 1)
+				return 1
 
-			if (this.x === 1) return 2;
+			if (this.x === 1)
+				return 2
 
-			return 3;
+			return 3
 		}
 
-	};
+	}
 
 /***/ },
 /* 5 */
@@ -793,48 +824,44 @@
 				input,
 				output: input,
 				parameters: 0
-			};
+			}
 
-			this.probability = opt.probability;
+			this.probability = opt.probability
 			this.storage = {
 				activations: input
-			};
+			}
 		}
 
 		forward(ctx) {
-			var X = this.dimensions.input.length;
-			var inpw = ctx.input.w,
-			    outw = ctx.output.w;
-			var prob = this.probability,
-			    act = ctx.activations;
+			var X = this.dimensions.input.length
+			var inpw = ctx.input.w, outw = ctx.output.w
+			var prob = this.probability, act = ctx.activations
 
 			// if (ctx.state.options.learning !== true) {
 			// 	for (var i = 0; i < X; i++)
 			// 		outw[i] = inpw[i] * prob 
-
+				
 			// 	return 
 			// }
 
 			for (var i = 0; i < X; i++) {
-				if (Math.random() < prob) {
-					// dropping out
-					outw[i] = 0.0;
-					act[i] = 0.0;
-				} else {
-					outw[i] = inpw[i] / (1.0 - prob);
-					act[i] = 1.0;
+				if (Math.random() < prob) { // dropping out
+					outw[i] = 0.0
+					act[i] = 0.0
+				}
+
+				else {
+					outw[i] = inpw[i] / (1.0 - prob)
+					act[i] = 1.0
 				}
 			}
 		}
 
 		backward(ctx) {
-			var X = this.dimensions.input.length;
-			var inpw = ctx.input.w,
-			    outw = ctx.output.w;
-			var inpdw = ctx.input.dw,
-			    outdw = ctx.output.dw;
-			var prob = this.probability,
-			    act = ctx.activations;
+			var X = this.dimensions.input.length
+			var inpw = ctx.input.w, outw = ctx.output.w
+			var inpdw = ctx.input.dw, outdw = ctx.output.dw
+			var prob = this.probability, act = ctx.activations
 
 			// if (ctx.state.options.learning !== true) {
 			// 	// for (var i = 0; i < X; i++)
@@ -844,7 +871,7 @@
 			// }
 
 			for (var i = 0; i < X; i++) {
-				inpdw[i] = act[i] * outdw[i] / (1.0 - prob);
+				inpdw[i] = act[i] * outdw[i] / (1.0 - prob)
 			}
 		}
 
@@ -876,23 +903,20 @@
 
 		forward(ctx) {
 			var X = this.dimensions.input.length;
-			var inpw = ctx.input.w,
-			    outw = ctx.output.w;
+			var inpw = ctx.input.w, outw = ctx.output.w
 
 			for (var i = 0; i < X; i++) {
-				outw[i] = 1 / (1 + Math.exp(-inpw[i]));
+				outw[i] = 1 / (1 + Math.exp(-inpw[i]))
 			}
 		}
 
 		backward(ctx) {
-			var X = this.dimensions.input.length;
-			var inpw = ctx.input.w,
-			    outw = ctx.output.w;
-			var inpdw = ctx.input.dw,
-			    outdw = ctx.output.dw;
+			var X = this.dimensions.input.length
+			var inpw = ctx.input.w, outw = ctx.output.w
+			var inpdw = ctx.input.dw, outdw = ctx.output.dw
 
 			for (var i = 0; i < X; i++) {
-				inpdw[i] = outw[i] * (1.0 - outw[i]) * outdw[i];
+				inpdw[i] = outw[i] * (1.0 - outw[i]) * outdw[i]
 			}
 		}
 
@@ -901,9 +925,8 @@
 	class TanhLayer extends NonLinearityLayer {
 
 		forward(ctx) {
-			var X = this.dimensions.input.length;
-			var inpw = ctx.input.w,
-			    outw = ctx.output.w;
+			var X = this.dimensions.input.length
+			var inpw = ctx.input.w, outw = ctx.output.w
 			var y = 0.0;
 
 			for (var i = 0; i < X; i++) {
@@ -913,11 +936,9 @@
 		}
 
 		backward(ctx) {
-			var X = this.dimensions.input.length;
-			var inpw = ctx.input.w,
-			    outw = ctx.output.w;
-			var inpdw = ctx.input.dw,
-			    outdw = ctx.output.dw;
+			var X = this.dimensions.input.length
+			var inpw = ctx.input.w, outw = ctx.output.w
+			var inpdw = ctx.input.dw, outdw = ctx.output.dw
 
 			for (var i = 0; i < X; i++) {
 				inpdw[i] = (1 - outw[i] * outw[i]) * outdw[i];
@@ -929,14 +950,13 @@
 	class ReLuLayer extends NonLinearityLayer {
 
 		constructor(input, opt) {
-			super(input, opt);
-			this.leaky = opt.leaky || 0;
+			super(input, opt)
+			this.leaky = opt.leaky || 0
 		}
 
 		forward(ctx) {
-			var X = this.dimensions.input.length;
-			var inpw = ctx.input.w,
-			    outw = ctx.output.w;
+			var X = this.dimensions.input.length
+			var inpw = ctx.input.w, outw = ctx.output.w
 			var y = 0.0;
 
 			for (var i = 0; i < X; i++) {
@@ -945,11 +965,9 @@
 		}
 
 		backward(ctx) {
-			var X = this.dimensions.input.length;
-			var inpw = ctx.input.w,
-			    outw = ctx.output.w;
-			var inpdw = ctx.input.dw,
-			    outdw = ctx.output.dw;
+			var X = this.dimensions.input.length
+			var inpw = ctx.input.w, outw = ctx.output.w
+			var inpdw = ctx.input.dw, outdw = ctx.output.dw
 
 			for (var i = 0; i < X; i++) {
 				inpdw[i] = inpw[i] > 0.0 ? outdw[i] : this.leaky * outdw[i];
@@ -979,19 +997,24 @@
 				parameters: 0
 			};
 
-			this.input = true;
-			this.passthrough = true;
+			this.input = true
+			this.passthrough = true
 		}
 
 		toInputVector(input, out) {
-			if (input === undefined) return;
+			if (input === undefined)
+				return 
 
 			if (Number.isInteger(input) && input < this.dimensions.intrinsic) {
-				out.fill(0.0);
-				out[input] = 1.0;
-			} else if (input.length === out.length) {
-				out.set(input);
-			} else {
+				out.fill(0.0)
+				out[input] = 1.0
+			} 
+
+			else if (input.length === out.length) {
+				out.set(input)
+			} 
+
+			else {
 				throw 'invalid input format';
 			}
 		}
@@ -1000,7 +1023,7 @@
 
 	module.exports = {
 		InputLayer
-	};
+	}
 
 /***/ },
 /* 8 */
@@ -1010,64 +1033,67 @@
 
 	class OutputLayer {
 
-	    constructor(inp, opt) {
+		constructor(inp, opt) {
 	        this.dimensions = {
 	            input: inp,
 	            output: inp,
 	            parameters: 0
 	        };
 
-	        this.output = true;
+	        this.output = true
 	    }
 
 	    result(ctx) {
-	        return ctx.output.w.clone();
+	        return ctx.output.w.clone()
 	    }
+
 
 	}
 
 	class SoftmaxLayer extends OutputLayer {
 
-	    forward(ctx) {
-	        var X = this.dimensions.input.length;
-	        var inpw = ctx.input.w,
-	            outw = ctx.output.w;
-	        var inpmax = -Infinity;
+		forward(ctx) {
+			var X = this.dimensions.input.length
+			var inpw = ctx.input.w, outw = ctx.output.w
+			var inpmax = -Infinity
 
-	        for (var i = 0; i < X; ++i) if (inpw[i] > inpmax) inpmax = inpw[i];
+			for (var i = 0; i < X; ++i)
+				if (inpw[i] > inpmax) inpmax = inpw[i]
 
-	        var expsum = 0.0;
-	        for (var i = 0; i < X; ++i) expsum += outw[i] = Math.exp(inpw[i] - inpmax);
+			var expsum = 0.0
+			for (var i = 0; i < X; ++i)
+				expsum += outw[i] = Math.exp(inpw[i] - inpmax)
 
-	        for (var i = 0; i < X; ++i) outw[i] /= expsum;
+			for (var i = 0; i < X; ++i)
+				outw[i] /= expsum
 	    }
 
 	    backward(ctx) {
-	        var X = this.dimensions.input.length;
-	        var inpdw = ctx.input.dw;
-	        var outdw = ctx.output.dw,
-	            outw = ctx.output.w;
+	        var X = this.dimensions.input.length
+	        var inpdw = ctx.input.dw
+	        var outdw = ctx.output.dw, outw = ctx.output.w
 
 	        for (var i = 0; i < X; i++) {
-	            var sum = outw[i] * (1 - outw[i]) * outdw[i];
+	            var sum = outw[i] * (1 - outw[i]) * outdw[i]
 
 	            for (var j = 0; j < X; j++) {
-	                if (i !== j) sum -= outw[j] * outw[i] * outdw[j];
+	                if (i !== j)  sum -= outw[j] * outw[i] * outdw[j]
 	            }
 
-	            inpdw[i] = sum;
+	            inpdw[i] = sum
 	        }
 	    }
 
 	    loss(ctx, desired, target) {
-	        return -Math.log(ctx.output.w[desired]);
+	        return -Math.log(ctx.output.w[desired]) 
 	    }
 
 	    toGradientVector(desired, actual, out) {
-	        if (Number.isInteger(desired) !== true || desired >= this.size) throw 'target must be class index in softmax';
+	        if (Number.isInteger(desired) !== true || desired >= this.size)
+	            throw 'target must be class index in softmax'
 
 	        for (var i = 0; i < this.size; i++) {
-	            out[i] = actual[i] - (desired === i ? 1.0 : 0.0);
+	            out[i] = actual[i] - (desired === i ? 1.0 : 0.0)
 	        }
 	    }
 
@@ -1076,47 +1102,51 @@
 	class RegressionLayer extends OutputLayer {
 
 	    constructor(inp, opt) {
-	        super(inp, opt);
-	        this.passthrough = true;
+	        super(inp, opt)
+	        this.passthrough = true
 	    }
 
 	    loss(ctx, desired) {
-	        var loss = 0.0;
-	        var grads = this.toGradientVector(desired, ctx.output.w);
+	        var loss = 0.0
+	        var grads = this.toGradientVector(desired, ctx.output.w)
 
 	        for (var i = 0; i < this.dimensions.input.length; i++) {
-	            loss += 0.5 * grads[i] * grads[i];
+	            loss += 0.5 * grads[i] * grads[i]
 	        }
 
-	        return loss;
+	        return loss
 	    }
 
 	    toGradientVector(desired, actual, out) {
-	        var X = this.dimensions.input.length;
+	        var X = this.dimensions.input.length
 
 	        if (out === undefined) {
-	            out = new Float64Array(X);
+	            out = new Float64Array(X)
 	        }
 
 	        // target is maximizing argmax, set n-th value to 1, rest to 0
 	        if (X > 1 && !isNaN(desired) && Number.isInteger(desired) && desired < X) {
 	            for (var i = 0; i < X; ++i) {
-	                out[i] = actual[i] - (i === desired ? 1.0 : 0.0);
+	                out[i] = actual[i] - (i === desired ? 1.0 : 0.0)
 	            }
 	        }
 
 	        // single value output
 	        else if (X === 1 && !isNaN(desired)) {
-	                out[0] = actual[0] - desired;
-	            } else if (desired instanceof Array || desired instanceof Float64Array) {
-	                for (var i = 0; i < out.length; ++i) {
-	                    out[i] = actual[i] - desired[i];
-	                }
-	            } else {
-	                throw 'invalid target';
-	            }
+	            out[0] = actual[0] - desired
+	        }
 
-	        return out;
+	        else if (desired instanceof Array || desired instanceof Float64Array) {
+	            for (var i = 0; i < out.length; ++i) {
+	                out[i] = actual[i] - desired[i]
+	            }
+	        }
+
+	        else {
+	            throw 'invalid target'
+	        }
+
+	        return out
 	    }
 
 	}
@@ -1124,6 +1154,7 @@
 	module.exports = {
 	    RegressionLayer, SoftmaxLayer
 	};
+
 
 /***/ },
 /* 9 */
@@ -1139,37 +1170,37 @@
 				input,
 				output: input,
 				parameters: 0
-			};
+			}
 
-			this.theta = opt.theta || 0.15;
-			this.sigma = opt.sigma || 0.3;
-			this.delta = opt.delta || 0.1;
+			this.theta = opt.theta || 0.15
+			this.sigma = opt.sigma || 0.3
+			this.delta = opt.delta || 0.1
 
 			this.storage = {
 				noise: input
-			};
+			}
 		}
 
 		forward(ctx) {
-			var X = this.dimensions.input.length;
-			var outw = ctx.output.w,
-			    inpw = ctx.input.w;
+			var X = this.dimensions.input.length
+			var outw = ctx.output.w, inpw = ctx.input.w
 
-			var alpha = 0.3;
+			var alpha = 0.3
 			for (var i = 0; i < X; i++) {
-				outw[i] = (1 - alpha) * inpw[i] + alpha * (ctx.noise[i] = Math.uhlenbeckOrnstein(ctx.noise[i], this.theta, this.sigma, this.delta));
+				outw[i] = (1-alpha) * inpw[i] + alpha * (ctx.noise[i] = Math.uhlenbeckOrnstein(ctx.noise[i], this.theta, this.sigma, this.delta))
 			}
 		}
 
 		backward(ctx) {
-			ctx.input.dw.set(ctx.output.dw);
+			ctx.input.dw.set(ctx.output.dw)
 		}
 
 	}
 
 	module.exports = {
-		UhlenbeckOrnsteinNoiseLayer
+	    UhlenbeckOrnsteinNoiseLayer
 	};
+
 
 /***/ },
 /* 10 */
@@ -1183,135 +1214,164 @@
 	class VariationalBayesianLayer {
 
 		constructor(input, opt) {
-			opt.size = Size.derive(opt.size);
+			opt.size = Size.derive(opt.size)
 
 			this.dimensions = {
 				input,
 				output: opt.size,
 				parameters: 2 * (input.length * opt.size.length + opt.size.length) // mean and std
-			};
+			}
 
 			this.storage = {
 				sample: input.length * opt.size.length + opt.size.length,
 				weights: input.length * opt.size.length + opt.size.length
-			};
+			}
+
+
 		}
 
 		forward(ctx) {
-			var sum = 0.0,
-			    X = this.dimensions.input.length,
-			    Y = this.dimensions.output.length;
-			var inpw = ctx.input.w,
-			    outw = ctx.output.w,
-			    paramw = ctx.params.w;
-			var sampled = ctx.sample,
-			    weights = ctx.weights,
-			    epsilon = 0;
-			var mu, std, w, b;
+			var sum = 0.0, X = this.dimensions.input.length, Y = this.dimensions.output.length
+			var inpw = ctx.input.w, outw = ctx.output.w, paramw = ctx.params.w
+			var sampled = ctx.sample, weights = ctx.weights, epsilon = 0
+			var mu, std, w, b
 
 			if (ctx.state.options.uncertainty) {
-				return this.uncertainty(ctx);
+				return this.uncertainty(ctx)
 			}
 
 			for (var i = 0; i < Y; i++) {
-				sum = 0.0;
+				sum = 0.0
 				for (var j = 0; j < X; j++) {
-					mu = paramw[(i * X + j) * 2 + 0];
-					std = Math.log(1 + Math.exp(paramw[(i * X + j) * 2 + 1]));
+					mu = paramw[(i * X + j) * 2 + 0] 
+					std = Math.log(1 + Math.exp( paramw[(i * X + j) * 2 + 1] ))
 
-					sampled[i * X + j] = epsilon = Math.randn();
-					weights[i * X + j] = w = mu + std * epsilon;
+					sampled[i * X + j] = epsilon = Math.randn()
+					weights[i * X + j] = w = mu + std * epsilon
 
-					sum += inpw[j] * w;
+					sum += inpw[j] * w
 				}
 
-				mu = paramw[(X * Y + i) * 2 + 0];
-				std = Math.log(1 + Math.exp(paramw[(X * Y + i) * 2 + 1]));
+				mu = paramw[(X * Y + i) * 2 + 0] 
+				std = Math.log(1 + Math.exp( paramw[(X * Y + i) * 2 + 1] ))
 
-				sampled[X * Y + i] = epsilon = Math.randn();
-				weights[X * Y + i] = b = mu + std * epsilon;
+				sampled[X * Y + i] = epsilon = Math.randn()
+				weights[X * Y + i] = b = mu + std * epsilon
 
-				outw[i] = sum + b;
+				outw[i] = sum + b
 			}
+
 		}
 
 		uncertainty(ctx) {
-			var sum = 0.0,
-			    X = this.dimensions.input.length,
-			    Y = this.dimensions.output.length;
-			var inpw = ctx.input.w,
-			    outw = ctx.output.w,
-			    paramw = ctx.params.w;
-			var std,
-			    mu,
-			    w,
-			    b,
-			    dir = ctx.state.options.uncertainty;
+			var sum = 0.0, X = this.dimensions.input.length, Y = this.dimensions.output.length
+			var inpw = ctx.input.w, outw = ctx.output.w, paramw = ctx.params.w
+			var std, mu, w, b, dir = ctx.state.options.uncertainty
 
 			for (var i = 0; i < Y; i++) {
-				sum = 0.0;
+				sum = 0.0
 				for (var j = 0; j < X; j++) {
-					mu = paramw[(i * X + j) * 2 + 0];
-					std = Math.log(1 + Math.exp(paramw[(i * X + j) * 2 + 1]));
-					w = mu + dir * std;
+					mu = paramw[(i * X + j) * 2 + 0] 
+					std = Math.log(1 + Math.exp( paramw[(i * X + j) * 2 + 1] ))
+					w = mu + dir * std
 
-					sum += inpw[j] * w;
+					sum += inpw[j] * w
 				}
 
-				mu = paramw[(X * Y + i) * 2 + 0];
-				std = Math.log(1 + Math.exp(paramw[(X * Y + i) * 2 + 1]));
-				b = mu + dir * std;
+				mu = paramw[(X * Y + i) * 2 + 0] 
+				std = Math.log(1 + Math.exp( paramw[(X * Y + i) * 2 + 1] ))
+				b = mu + dir * std
 
-				outw[i] = sum + b;
+				outw[i] = sum + b
 			}
 		}
 
 		backward(ctx) {
-			var sum = 0.0,
-			    X = this.dimensions.input.length,
-			    Y = this.dimensions.output.length;
-			var inpw = ctx.input.w,
-			    outw = ctx.output.w,
-			    paramw = ctx.params.w;
-			var inpdw = ctx.input.dw,
-			    outdw = ctx.output.dw,
-			    paramdw = ctx.params.dw;
-			var sampled = ctx.sample,
-			    weights = ctx.weights;
+			var sum = 0.0, X = this.dimensions.input.length, Y = this.dimensions.output.length
+			var inpw = ctx.input.w, outw = ctx.output.w, paramw = ctx.params.w
+			var inpdw = ctx.input.dw, outdw = ctx.output.dw, paramdw = ctx.params.dw
+			var sampled = ctx.sample, weights = ctx.weights
 
 			for (var i = 0; i < X; i++) {
-				sum = 0.0;
+				sum = 0.0
 				for (var j = 0; j < Y; j++) {
-					paramdw[(j * X + i) * 2 + 0] = inpw[i] * outdw[j];
-					paramdw[(j * X + i) * 2 + 1] = inpw[i] * outdw[j] * sampled[j * X + i] / (1.0 + Math.exp(-paramw[(j * X + i) * 2 + 1]));
-					sum += weights[j * X + i] * outdw[j];
+					paramdw[(j * X + i) * 2 + 0] = inpw[i] * outdw[j]
+					paramdw[(j * X + i) * 2 + 1] = inpw[i] * outdw[j] * sampled[j * X + i] / (1.0 + Math.exp(-paramw[(j * X + i) * 2 + 1]))
+					sum += weights[j * X + i] * outdw[j]
 				}
 
-				inpdw[i] = sum;
+				inpdw[i] = sum
 			}
 
 			for (var i = 0; i < Y; i++) {
-				paramdw[(X * Y + i) * 2 + 0] = outdw[i];
-				paramdw[(X * Y + i) * 2 + 1] = outdw[i] * sampled[X * Y + i] / (1.0 + Math.exp(-paramw[(X * Y + i) * 2 + 1]));
+				paramdw[(X * Y + i) * 2 + 0] = outdw[i]
+				paramdw[(X * Y + i) * 2 + 1] = outdw[i] * sampled[X * Y + i] / (1.0 + Math.exp(-paramw[(X * Y + i) * 2 + 1]))
 			}
 		}
 
 		initialize(params) {
-			var H = this.dimensions.parameters / 2;
-			var elements = this.dimensions.input.length + this.dimensions.output.length;
-			var scale = Math.sqrt(2.0 / elements);
+			var H = this.dimensions.parameters / 2
+			var elements = (this.dimensions.input.length + this.dimensions.output.length)
+			var scale = Math.sqrt(2.0 / elements)
 
-			for (var i = 0; i < H; i += 2) {
-				params.w[i] = Math.randn() * scale;
-				params.w[i + 1] = Math.randn();
+			for (var i = 0; i < H; i+=2) {
+				params.w[i] = Math.randn() * scale
+				params.w[i + 1] = Math.randn()
 			}
 		}
 
 	}
 
+	class ConfidenceLayer {
+
+		constructor(input, opt) {
+
+			this.dimensions = {
+				input,
+				output: new Size(1, 1, input.length / 2),
+				parameters: 0
+			}
+
+			this.storage = {
+				sample: this.dimensions.output.length
+			}
+
+
+		}
+
+		forward(ctx) {
+			var Y = this.dimensions.output.length
+			var inpw = ctx.input.w, outw = ctx.output.w
+			var sampled = ctx.sample
+
+			for (var i = 0; i < Y; i++) {
+				var mu = inpw[i * 2 + 0]
+				var std = inpw[i * 2 + 1]
+
+				sampled[i] = Math.randn()
+				outw[i] = mu + sampled[i] * std
+			}
+
+		}
+
+		backward(ctx) {
+			var Y = this.dimensions.output.length
+			var inpw = ctx.input.w, outw = ctx.output.w
+			var inpdw = ctx.input.dw, outdw = ctx.output.dw
+			var sampled = ctx.sample
+
+			for (var i = 0; i < Y; i++) {
+				inpdw[i * 2 + 0] = outdw[i]
+				inpdw[i * 2 + 1] = sampled[i] * outdw[i]
+			}
+		}
+
+
+	}
+
 	module.exports = {
-		VariationalBayesianLayer
-	};
+		VariationalBayesianLayer, ConfidenceLayer
+	}
 
 /***/ },
 /* 11 */
@@ -1322,12 +1382,12 @@
 	module.exports = class Tensor {
 
 		constructor(size) {
-			this.size = Size.derive(size);
+			this.size = Size.derive(size)
 			this.w = new Float64Array(this.size.length);
 			this.dw = new Float64Array(this.size.length);
 		}
 
-	};
+	}
 
 /***/ },
 /* 12 */
@@ -1349,17 +1409,19 @@
 	        const STRIP_COMMENTS = /((\/\/.*$)|(\/\*[\s\S]*?\*\/))/mg;
 	        const ARGUMENT_NAMES = /([^\s,]+)/g;
 
-	        if (this.$args) return this.$args;
+	        if (this.$args)
+	            return this.$args;
 
 	        var fnStr = this.toString().replace(STRIP_COMMENTS, '');
 	        var result = fnStr.slice(fnStr.indexOf('(') + 1, fnStr.indexOf(')')).match(ARGUMENT_NAMES);
-	        if (result === null) result = [];
+	        if (result === null)
+	            result = [];
 
 	        return this.$args = result;
 	    },
 
 	    getSource() {
-	        return this.toString().replace(/^[^{]+{/i, '').replace(/}[^}]*$/i, '');
+	        return this.toString().replace(/^[^{]+{/i, '').replace(/}[^}]*$/i, '')
 	    },
 
 	    decompile() {
@@ -1371,7 +1433,9 @@
 	Object.assign(Object, {
 
 	    each(obj, callback) {
-	        for (var key in obj) if (obj.hasOwnProperty(key)) callback(key, obj[key]);
+	        for (var key in obj)
+	            if (obj.hasOwnProperty(key))
+	                callback(key, obj[key]);
 	    }
 
 	});
@@ -1410,7 +1474,7 @@
 
 	    constructor(opt) {
 	        this.update(opt || {});
-	        this.uuid = ++Optim.INDEX;
+	        this.uuid = ++Optim.INDEX
 	    }
 
 	    update(opt) {
@@ -1434,16 +1498,20 @@
 	    }
 
 	    build() {
-	        if (this.options.type === 'descent') this.apply = this.assemble('-');else if (this.options.type === 'ascent') this.apply = this.assemble('+');else throw 'unrecognized optimizer type';
+	        if (this.options.type === 'descent')
+	            this.apply = this.assemble('-')
+	        else if (this.options.type === 'ascent')
+	            this.apply = this.assemble('+')
+	        else 
+	            throw 'unrecognized optimizer type'
 	    }
 
 	    assemble(dir) {
 	        var method = Optim.methods[this.method];
-	        var regDir = dir === '+' ? '-' : '+';
+	        var regDir = dir === '+' ? '-' : '+'
 
 	        var performer = (method.deliver ? method.deliver(this.options) : method.perform).decompile();
-	        var stateDefs = [],
-	            produceDefs = [];
+	        var stateDefs = [], produceDefs = [];
 
 	        this.states = performer.arguments;
 
@@ -1453,9 +1521,11 @@
 
 	        function _definitions() {
 	            var defs = '';
-	            if (stateDefs.length > 0) defs += 'var ' + stateDefs.join(',') + ';';
+	            if (stateDefs.length > 0)
+	                defs += 'var ' + stateDefs.join(',') + ';';
 
-	            if (produceDefs.length > 0) defs += 'var ' + produceDefs.join(',') + ';';
+	            if (produceDefs.length > 0)
+	                defs += 'var ' + produceDefs.join(',') + ';';
 
 	            return defs;
 	        }
@@ -1495,7 +1565,8 @@
 
 	        var grad = _gradient.call(this);
 
-	        var fn = `"use strict";
+	        var fn =
+	            `"use strict";
 	            var w = tensor.w, dw = tensor.dw, accdw = dw.acc;
 	            var dx, gij, grad, iteration = dw.iteration;
 	            if (iteration < 1) return ;
@@ -1514,30 +1585,26 @@
 	    }
 
 	    accumulate(tensor, weighted) {
-	        weighted = weighted || 1;
-	        var w = tensor.w,
-	            dw = tensor.dw,
-	            accdw = dw.acc;
-	        var dx,
-	            gij,
-	            grad,
-	            iteration = dw.iteration += weighted;
+	        weighted = weighted || 1
+	        var w = tensor.w, dw = tensor.dw, accdw = dw.acc;
+	        var dx, gij, grad, iteration = (dw.iteration += weighted);
 	        for (var i = 0; i < w.length; ++i) accdw[i] += weighted * dw[i];
 	    }
 
 	    initialize(tensor, set, linked) {
-	        if (!tensor.initialized) {
-	            // general initialization
+	        if (!tensor.initialized) { // general initialization
 	            tensor.dw.iteration = 0;
-	            tensor.dw.acc = new Float64Array(tensor.dw.length);
+	            tensor.dw.acc = new Float64Array(tensor.dw.length)
 	        }
 
-	        for (var i = 0; i < this.states.length; ++i) {
-	            // specific (algorithm dependent) initialization
-	            if (this.states[i] in tensor.dw) tensor.dw[this.states[i]] = tensor.dw[this.states[i]].fill(0.0);else tensor.dw[this.states[i]] = new Float64Array(tensor.dw.length);
+	        for (var i = 0; i < this.states.length; ++i) { // specific (algorithm dependent) initialization
+	            if (this.states[i] in tensor.dw)
+	                tensor.dw[this.states[i]] = tensor.dw[this.states[i]].fill(0.0)
+	            else
+	                tensor.dw[this.states[i]] = new Float64Array(tensor.dw.length)
 	        }
 
-	        tensor.initialized = true;
+	        tensor.initialized = true
 	    }
 
 	    static register(name, value) {
@@ -1552,9 +1619,7 @@
 
 	    deliver(opt) {
 	        if (opt.momentum === 0) {
-	            return function () {
-	                dx = opt.rate * gij;
-	            };
+	            return function() { dx = opt.rate * gij; }
 	        }
 
 	        return this.perform;
@@ -1606,9 +1671,10 @@
 
 	});
 
-	Optim.INDEX = 0;
+	Optim.INDEX = 0
 
 	module.exports = Optim;
+
 
 /***/ },
 /* 13 */
@@ -2545,11 +2611,12 @@
 /***/ function(module, exports, __webpack_require__) {
 
 	// var network = require('../network.js')
-	var Window = __webpack_require__(28);
-	var Experience = __webpack_require__(29);
-	var Buffers = __webpack_require__(30);
-	var DQN = __webpack_require__(31);
-	var DDPG = __webpack_require__(32);
+	var Window = __webpack_require__(28)
+	var Experience = __webpack_require__(29)
+	var Buffers = __webpack_require__(30)
+	var DQN = __webpack_require__(31)
+	var DDPG = __webpack_require__(32)
+
 
 	class Agent {
 
@@ -2559,187 +2626,211 @@
 
 				type: 'q-learning', // sarsa or q-learning
 				experience: 25e3,
-				discount: opt.discount || 0.98,
-				learningPerTick: 64,
 				temporalWindow: 0,
+
+				learningPerTick: 64,
+				startLearningAt: 1000,
 
 				buffer: Buffers.PrioritizedReplayBuffer,
 
 				algorithm: 'ddpg',
 
-				beta: 0.5 }, opt);
+				discount: opt.discount || 0.95,
+				beta: 0.5, // how to prioritise experiences (0 = no prioritisation, 1 = full prioritisation)
+
+			}, opt)
 
 			// options
-			this.states = this.options.states; // state space
-			this.actions = this.options.actions; // action space
-			this.input = this.states + this.options.temporalWindow * (this.states + this.actions); // extended state (over time)
+			this.states = this.options.states // state space
+			this.actions = this.options.actions // action space
+			this.input = Agent.getInputDimension(this.states, this.actions, this.options.temporalWindow) // extended state (over time)
 
 			// settings
-			this.buffer = new this.options.buffer(this.options.experience);
+			this.buffer = new this.options.buffer(this.options.experience)
 			this.history = {
 				states: new Window(Math.max(2, this.options.temporalWindow)),
 				actions: new Window(Math.max(2, this.options.temporalWindow)),
 				inputs: new Window(2),
-				rewards: new Window(2)
-			};
+				rewards: new Window(2),
+			}
 
-			this.age = 1;
-			this.learning = true;
-			this.ready = true;
+			this.age = 1
+			this.learning = true
+			this.ready = true
 
 			switch (this.options.algorithm) {
 				case 'dqn':
-					this.algorithm = new DQN(this);break;
+					this.algorithm = new DQN(this); break
 				case 'ddpg':
-					this.algorithm = new DDPG(this);break;
+					this.algorithm = new DDPG(this); break
 				default:
-					throw 'unknown algorithm';
+					throw 'unknown algorithm'
 			}
 		}
 
 		/**
-	  * Let the agent make an action, includes exploration through noise
-	  * @param  {Array} state
-	  * @return {Array}       An action
-	  */
+		 * Let the agent make an action, includes exploration through noise
+		 * @param  {Array} state
+		 * @return {Array}       An action
+		 */
 		policy(state) {
-			if (!this.ready) return;
+			if (!this.ready)
+				return
 
-			var input = this.getStateInputVector(state);
-			var action = this.act(input);
+			var input = this.getStateInputVector(state)
+			var action = this.act(input)
 
-			this.history.inputs.push(input);
-			this.history.states.push(state);
-			this.history.actions.push(action);
-			this.acted = true;
+			this.history.inputs.push(input)
+			this.history.states.push(state)
+			this.history.actions.push(action)
+			this.acted = true
 
-			return action;
+			return action
 		}
 
 		actionToVector(action) {
-			if (action instanceof Float64Array) return action;
+			if (action instanceof Float64Array)
+				return action
 
-			if (Number.isInteger(action)) return Float64Array.oneHot(action, this.actions);
+			if (Number.isInteger(action))
+				return Float64Array.oneHot(action, this.actions)
 
-			throw 'action invalid';
+			throw 'action invalid'
 		}
 
 		getStateInputVector(state) {
 			if (this.options.temporalWindow > 0) {
-				var input = new Float64Array(this.input);
-				var cursor = 0;
-
+				var input = new Float64Array(this.input)
+				var cursor = 0
+				
 				for (var t = this.options.temporalWindow - 1; t >= 0; t--) {
 					if (this.history.states.size > t) {
-						input.set(this.history.states.get(t), cursor);
-						input.set(this.actionToVector(this.history.actions.get(t)), cursor + this.states);
+						input.set(this.history.states.get(t), cursor)
+						input.set(this.actionToVector( this.history.actions.get(t) ), cursor + this.states) 
 					}
-
-					cursor += this.states + this.actions;
+					
+					cursor += this.states + this.actions
 				}
 
-				input.set(state, cursor);
+				input.set(state, cursor)
 
-				return input;
+				return input
 			}
 
-			return state;
+			return state
 		}
 
 		/**
-	  * Simulate that the agent did an action
-	  * @param  {Array} state
-	  * @param  {Array} action
-	  */
+		 * Simulate that the agent did an action
+		 * @param  {Array} state
+		 * @param  {Array} action
+		 */
 		simulate(state, action) {
-			if (!this.ready) return;
+			if (!this.ready)
+				return
 
-			var input = this.getStateInputVector(state);
+			var input = this.getStateInputVector(state)
 
-			this.history.inputs.push(input);
-			this.history.states.push(state);
-			this.history.actions.push(action);
-			this.acted = true;
+			this.history.inputs.push(input)
+			this.history.states.push(state)
+			this.history.actions.push(action)
+			this.acted = true
 		}
 
 		/**
-	  * Adds an experience to the buffer and replays an batch of experiences
-	  * @param  {Float} reward
-	  * @return {Float}        The loss
-	  */
+		 * Adds an experience to the buffer and replays an batch of experiences
+		 * @param  {Float} reward
+		 * @return {Float}        The loss
+		 */
 		learn(reward) {
-			if (!this.acted || !this.ready) return;
+			if (!this.acted || !this.ready)
+				return 
 
-			this.acted = false;
-			this.history.rewards.push(reward);
+			this.acted = false
+			this.history.rewards.push(reward)
 
 			// Learning happens always one step after actually experiencing
-			if (this.history.states.size < 2) return;
-
-			if (this.learning === false) return;
+			if (this.history.states.size < 2 || this.learning === false) 
+				return
 
 			// Create new experience
-			var e = new Experience(this);
-			e.action0 = this.history.actions.get(1);
-			e.state0 = this.history.inputs.get(1);
-			e.reward0 = this.history.rewards.get(1);
-			e.state1 = this.history.inputs.get(0);
-			e.action1 = this.history.actions.get(0); // for SARSA only
-			e.init(); // set loss etc.
+			var e = new Experience(this)
+			e.action0 = this.history.actions.get(1)
+			e.state0 = this.history.inputs.get(1)
+			e.reward0 = this.history.rewards.get(1)
+			e.state1 = this.history.inputs.get(0)
+			e.action1 = this.history.actions.get(0) // for SARSA only
+			e.init() // set loss etc.
 
 			// Add experience to replay buffer
-			this.buffer.add(e);
+			this.buffer.add(e)
 
 			// Get older
-			++this.age;
+			++this.age 
+
+			if (this.pool)
+				return 0.0
+
+			return this.backward()
+		}
+
+		backward() {
+			if (this.options.startLearningAt > this.age)
+				return false
 
 			// Learn batch
-			var loss = this.replay();
+			var loss = this.replay()
 
 			// Execute algorithm
-			this.algorithm.learn(e);
-
-			return loss;
+			this.algorithm.learn()
+	 
+			return loss
 		}
 
-		replay() {
-			var batch = this.buffer.sample(this.options.learningPerTick),
-			    loss = 0.0;
+		replay() {		
+			var batch = this.buffer.sample(this.options.learningPerTick), loss = 0.0
 
 			for (var i = 0; i < batch.length; i++) {
-				loss += batch[i].step();
+				loss += batch[i].step()
 			}
 
-			this.buffer.updateAfterLearning(batch);
+			this.buffer.updateAfterLearning(batch)
 
-			return loss / batch.length;
+			return loss / batch.length
 		}
+
 
 		// 
 		act(state, target) {
-			return this.algorithm.act(state, target);
+			return this.algorithm.act(state, target)
 		}
 
-		value(state, action, target) {
-			return this.algorithm.value(state, action, target);
+		value(state, action, target)  {
+			return this.algorithm.value(state, action, target)
 		}
 
 		evaluate(state, target) {
-			return this.value(state, this.act(state, target), target);
+			return this.value(state, this.act(state, target), target)
 		}
+
+
 
 		// utility functions
 		export() {
-			return this.algorithm.export();
+			return this.algorithm.export()
 		}
 
 		import(params) {
-			this.algorithm.import(params);
+			return this.algorithm.import(params)
+		}
+
+		static getInputDimension(states, actions, temporalWindow) {
+			return states + temporalWindow * (states + actions)
 		}
 
 	}
 
-	module.exports = Agent;
+	module.exports = Agent
 
 /***/ },
 /* 28 */
@@ -2748,29 +2839,29 @@
 	class Window {
 
 		constructor(n) {
-			this.list = [];
-			this.length = n;
+			this.list = []
+			this.length = n
 		}
 
 		push(value) {
-			this.list.unshift(value);
+			this.list.unshift(value)
 
 			if (this.list.length > this.length) {
-				this.list.pop();
+				this.list.pop()
 			}
 		}
 
 		get(nth) {
-			return this.list[nth];
+			return this.list[nth]
 		}
 
 		get size() {
-			return this.list.length;
+			return this.list.length
 		}
 
 	}
 
-	module.exports = Window;
+	module.exports = Window
 
 /***/ },
 /* 29 */
@@ -2779,47 +2870,51 @@
 	class Experience {
 
 		constructor(agent) {
-			this.agent = agent;
-			this.learnSteps = 0;
+			this.agent = agent
+			this.learnSteps = 0
 
-			if (agent.options.type === 'sarsa') this.target = this.__sarsa_target;else this.target = this.__q_target;
+			if (agent.options.type === 'sarsa')
+				this.target = this.__sarsa_target
+			else
+				this.target = this.__q_target
 		}
 
 		__q_target() {
-			return this.reward0 + this.agent.options.discount * this.agent.evaluate(this.state1, true); // this.agent.value(this.state1, this.agent.act(this.state1, true), true)
+			return this.reward0 + this.agent.options.discount * this.agent.evaluate(this.state1, true) // this.agent.value(this.state1, this.agent.act(this.state1, true), true)
 		}
 
 		__sarsa_target() {
-			return this.reward0 + this.agent.options.discount * this.agent.value(this.state1, this.action1, true);
+			return this.reward0 + this.agent.options.discount * this.agent.value(this.state1, this.action1, true)
 		}
 
 		estimate() {
-			return this.value = this.agent.value(this.state0, this.action0);
+			return this.value = this.agent.value(this.state0, this.action0)
 		}
 
 		step() {
-			this.loss = this.agent.algorithm.optimize(this);
+			this.loss = this.agent.algorithm.optimize(this)
 
-			this.learnSteps++;
-			this.lastLearnedAt = this.agent.age;
+			this.learnSteps++
+			this.lastLearnedAt = this.agent.age
 
-			return this.loss;
+			return this.loss
 		}
 
 		init() {
-			this.loss = this.agent.algorithm.optimize(this, false);
-			this.atAge = this.agent.age;
+			this.loss = this.agent.algorithm.optimize(this, false)
+			this.atAge = this.agent.age
 		}
 
 		get priority() {
-			if (this.loss === undefined) return undefined;
+			if (this.loss === undefined)
+				return undefined
 
-			return Math.pow(this.loss, this.agent.options.beta || 0.5);
+			return Math.pow(this.loss, this.agent.options.beta || 0.5)
 		}
 
 	}
 
-	module.exports = Experience;
+	module.exports = Experience
 
 /***/ },
 /* 30 */
@@ -2827,18 +2922,10 @@
 
 	class ReplayBuffer {
 
-		add(e) {
-			throw 'not implemented';
-		}
-		sample(n) {
-			throw 'not implemented';
-		}
-		getAverageLoss() {
-			throw 'not implemented';
-		}
-		getImportanceSamplingWeight(e) {
-			return 1.0;
-		}
+		add(e) { throw 'not implemented' }
+		sample(n) { throw 'not implemented' }
+		getAverageLoss() { throw 'not implemented' }
+		getImportanceSamplingWeight(e) { return 1.0 }
 		updateAfterLearning() {}
 
 	}
@@ -2846,38 +2933,42 @@
 	class UniformReplayBuffer extends ReplayBuffer {
 
 		constructor(size) {
-			super();
-			this.buffer = [];
-			this.size = size;
+			super()
+			this.buffer = []
+			this.size = size
 		}
 
 		add(e) {
 
 			if (this.buffer.length >= this.size) {
-				this.buffer[Math.randi(0, this.buffer.length)] = e;
-			} else {
-				this.buffer.push(e);
+				this.buffer[Math.randi(0, this.buffer.length)] = e
 			}
+
+			else {
+				this.buffer.push(e)
+			}
+			
 		}
 
 		sample(n) {
-			var batch = [];
+			var batch = []
 
-			if (this.buffer.length <= n) return this.buffer;
-
+			if (this.buffer.length <= n)
+				return this.buffer
+			
 			for (var i = 0; i < n; i++) {
-				batch.push(Array.random(this.buffer));
+				batch.push(Array.random(this.buffer))
 			}
 
-			return batch;
+			return batch
 		}
 
 		draw() {
-			return Array.random(this.buffer);
+			return Array.random(this.buffer)
 		}
 
 		getAverageLoss() {
-			return Array.sum(this.buffer, x => x.loss) / this.buffer.length;
+			return Array.sum(this.buffer, x => x.loss) / this.buffer.length
 		}
 
 	}
@@ -2885,65 +2976,71 @@
 	class PrioritizedReplayBuffer extends ReplayBuffer {
 
 		constructor(N) {
-			super();
+			super()
 
-			this.root = new PrioritizedReplayBuffer.Node(null, null);
-			this.iterations = 0;
-			this.size = 0;
+			this.root = new PrioritizedReplayBuffer.Node(null, null)
+			this.iterations = 0
+			this.size = 0
 
-			this.maxISW = 1.0;
-			this.beta = 0.5;
+			this.maxISW = 1.0
+			this.beta = 0.5
 
 			for (var i = 0; i < N - 1; ++i) {
-				this.root.add(null);
+				this.root.add(null)
 			}
 
-			this.leafs = this.root.getLeafs();
+			this.leafs = this.root.getLeafs()
 
-			if (this.leafs.length !== this.root.size) throw 'could not create replay tree...';
+			if (this.leafs.length !== this.root.size)
+				throw 'could not create replay tree...'
 		}
 
 		add(e) {
-			this.leafs[this.iterations % this.leafs.length].set(e);
-			this.size = Math.max(this.size, this.iterations % this.leafs.length + 1);
-			this.iterations += 1;
+			this.leafs[this.iterations % this.leafs.length].set(e)
+			this.size = Math.max(this.size, this.iterations % this.leafs.length + 1)
+			this.iterations += 1
 		}
 
-		sample(n) {
-			var batch = [];
+		sample(n) { 
+			var batch = []
 
-			this.maxISW = Math.pow(this.size * (this.root.minimum / this.root.value), -this.beta);
+			this.maxISW = Math.pow(this.size * (this.root.minimum / this.root.value), -this.beta)
 
-			if (this.size < 5 * n) return [];
+			if (this.size < 5 * n) 
+				return [ ]
 
-			while (batch.length < n) batch.push(this.root.cumulativeSample(Math.random() * this.root.value).experience);
+			while (batch.length < n)
+				batch.push(this.root.cumulativeSample(Math.random() * this.root.value).experience)
 
-			return batch;
+			return batch
 		}
 
 		draw(prioritised) {
-			if (!prioritised) return this.leafs[Math.randi(0, this.size)].experience;
+			if (!prioritised) 
+				return this.leafs[Math.randi(0, this.size)].experience
 
-			return this.root.cumulativeSample(Math.random() * this.root.value).experience;
+			return this.root.cumulativeSample(Math.random() * this.root.value).experience
 		}
 
 		updateAfterLearning(batch) {
 			for (var i = 0; i < batch.length; i++) {
-				var e = batch[i];
-				if (e !== e.node.experience) throw 'association error';
+				var e = batch[i]
+				if (e !== e.node.experience)
+					throw 'association error'
 
-				e.node.revalue();
+				e.node.revalue()
 			}
 		}
 
-		getImportanceSamplingWeight(e) {
-			if (e.priority === undefined) return 1.0;
+		getImportanceSamplingWeight(e) { 
+			if (e.priority === undefined)
+				return 1.0
 
-			return Math.pow(this.size * (e.priority / this.root.value), -this.beta);
+			return Math.pow(this.size * (e.priority / this.root.value), -this.beta)
 		}
 
 		getAverageLoss() {
-			return this.root.value / this.root.size;
+			return this.root.value / this.root.size
 		}
 
 	}
@@ -2951,95 +3048,106 @@
 	PrioritizedReplayBuffer.Node = class Node {
 
 		constructor(parent, experience) {
-			this.parent = parent;
-			this.children = [];
-			this.size = 1;
-			this.value = 0.0;
+			this.parent = parent
+			this.children = []
+			this.size = 1
+			this.value = 0.0
 
-			this.maximum = -Infinity;
-			this.minimum = Infinity;
+			this.maximum = -Infinity
+			this.minimum = Infinity
 
-			this.experience = experience;
-			this.revalue();
+			this.experience = experience
+			this.revalue()
 		}
+
 
 		cumulativeSample(x) {
-			if (this.children.length === 0) return this;
+			if (this.children.length === 0)
+				return this
 
-			if (this.children[0].value < x) return this.children[1].cumulativeSample(x - this.children[0].value);else return this.children[0].cumulativeSample(x);
-		}
+			if (this.children[0].value < x)
+				return this.children[1].cumulativeSample(x - this.children[0].value)
+			else 
+				return this.children[0].cumulativeSample(x)
+		} 
 
 		update() {
-			this.value = Array.sum(this.children, x => x.value);
-			this.maximum = this.children.reduce((a, b) => a.maximum > b.maximum ? a : b).maximum;
-			this.minimum = this.children.reduce((a, b) => a.minimum < b.minimum ? a : b).minimum;
+			this.value = Array.sum(this.children, x => x.value)
+			this.maximum = this.children.reduce((a, b) => a.maximum > b.maximum ? a : b).maximum
+			this.minimum = this.children.reduce((a, b) => a.minimum < b.minimum ? a : b).minimum
 
-			if (this.parent) this.parent.update();
+			if (this.parent)
+				this.parent.update()
 		}
 
 		revalue() {
-			if (this.children.length > 0) throw 'not possible';
+			if (this.children.length > 0)
+				throw 'not possible'
 
-			if (!this.experience) return;
+			if (!this.experience)
+				return 
 
-			this.value = this.experience.priority || 0.0;
+			this.value = this.experience.priority || 0.0
 
-			this.maximum = this.value;
-			this.minimum = this.value;
+			this.maximum = this.value
+			this.minimum = this.value
 
-			if (this.parent) this.parent.update();
+			if (this.parent)
+				this.parent.update()
 		}
 
 		set(experience) {
-			if (this.children.length > 0) throw "can't set experience of node with children";
+			if (this.children.length > 0)
+				throw "can't set experience of node with children"
 
-			experience.node = this;
+			experience.node = this
 
-			this.experience = experience;
-			this.revalue();
+			this.experience = experience
+			this.revalue()
 		}
 
 		add(experience) {
-			if (this.children.length === 0) {
-				// branch off
-				this.children.push(new PrioritizedReplayBuffer.Node(this, this.experience));
-				this.children.push(new PrioritizedReplayBuffer.Node(this, experience));
-				this.experience = null;
+			if (this.children.length === 0) { // branch off
+				this.children.push(new PrioritizedReplayBuffer.Node(this, this.experience))
+				this.children.push(new PrioritizedReplayBuffer.Node(this, experience))
+				this.experience = null
 
 				// this.update()
 			} else {
-				this.children.reduce((a, b) => a.size < b.size ? a : b).add(experience);
+				this.children.reduce((a, b) => a.size < b.size ? a : b).add(experience)
 			}
 
-			this.size++;
+			this.size++
 		}
 
 		descent(dir) {
-			if (this.children.length === 0) return this;
+			if (this.children.length === 0)
+				return this
 
-			return this.children[dir(this.children[0], this.children[1])].descent(dir);
+			return this.children[ dir(this.children[0], this.children[1]) ].descent(dir)
 		}
 
 		getLeafs() {
-			if (this.children.length === 0) return [this];
+			if (this.children.length === 0)
+				return [ this ]
 
-			var unfolded = [];
+			var unfolded = []
 			for (var i = 0; i < this.children.length; i++) {
-				unfolded.push(this.children[i].getLeafs());
+				unfolded.push(this.children[i].getLeafs())
 			}
 
-			return Array.prototype.concat.apply([], unfolded);
+			return Array.prototype.concat.apply([], unfolded)
 		}
 
-	};
+	}
 
 	module.exports = {
 
-		ReplayBuffer,
-		UniformReplayBuffer,
+		ReplayBuffer, 
+		UniformReplayBuffer, 
 		PrioritizedReplayBuffer
 
-	};
+	}
 
 /***/ },
 /* 31 */
@@ -3055,104 +3163,116 @@
 
 				alpha: 0.1, // advantage learning (AL) http://arxiv.org/pdf/1512.04860v1.pdf; increase action-gap
 				theta: 0.001, // soft target updates
-
+				
 				learningSteps: 100e3,
 				learningStepsBurnin: 3e3,
 
 				epsilonMin: 0.05,
 				epsilonAtTestTime: 0.05
 
-			}, agent.options);
+
+			}, agent.options)
 
 			//
-			this.net = agent.options.network.newState();
-			this.target = this.net.model.newState(); // agent.options.target.actor.newState()
+			this.net = agent.options.network.newState()
+			this.target = this.net.model.newState() // agent.options.target.actor.newState()
 			// this.target.configuration.copyParametersFrom(this.net.configuration)
 
 			//
-			this.targetWeightCopy = this.progressiveCopy.bind(this, this.net.configuration);
+			this.targetWeightCopy = this.progressiveCopy.bind(this, this.net.configuration)
 
 			this.net.configuration.useOptimizer({
 				type: 'descent',
 				method: 'adadelta',
-				regularization: { l2: 1e-3 }
-			});
+	            regularization: { l2: 1e-3 }
+			})
 
 			// agent
-			this.agent = agent;
-			this.buffer = agent.buffer;
+			this.agent = agent
+			this.buffer = agent.buffer
 
-			this.states = this.agent.states;
-			this.actions = this.agent.actions;
-			this.input = this.agent.input;
+			this.states = this.agent.states
+			this.actions = this.agent.actions
+			this.input = this.agent.input
 		}
 
 		// what to do?
 		act(state, target) {
 
-			if (this.agent.learning) this.epsilon = Math.max(1.0 - Math.max((this.agent.age - this.options.learningStepsBurnin) / this.options.learningSteps, 0.0), this.options.epsilonMin);else this.epsilon = this.options.epsilonAtTestTime;
+			if (this.agent.learning)
+				this.epsilon = Math.max(1.0 - Math.max((this.agent.age - this.options.learningStepsBurnin) / this.options.learningSteps, 0.0), this.options.epsilonMin)
+			else
+				this.epsilon = this.options.epsilonAtTestTime
 
 			if (Math.random() <= this.epsilon) {
-				return Math.randi(0, this.actions);
+				return Math.randi(0, this.actions)
 			}
 
-			this.net.forward(state);
+			this.net.forward(state)
 
-			return this.net.out.w.maxi();
+			return this.net.out.w.maxi()
+
 		}
 
 		// how good is an action at state
 		value(state, action, target) {
-			target = target == null ? this.net : this.target;
-			target.forward(state);
-			return target.out.w[action];
+			target = target == null ? this.net : this.target
+			target.forward(state)
+			return target.out.w[action]
 		}
 
 		// replay
 		optimize(e, descent = true) {
-			var target = e.target();
-			var value = e.estimate();
+			var target = e.target()
+			var value = e.estimate()
 
-			var grad = value - target;
-			var gradAL = grad + this.options.alpha * (value - this.agent.evaluate(e.state0, true)); // advantage learning
-			var isw = this.buffer.getImportanceSamplingWeight(e);
+			var grad = value - target
+			var gradAL = grad + this.options.alpha * (value - this.agent.evaluate(e.state0, true)) // advantage learning
+			var isw = this.buffer.getImportanceSamplingWeight(e)
 
-			this.net.out.dw.fill(0.0);
-			this.net.out.dw[e.action0] = gradAL * isw;
+			this.net.out.dw.fill(0.0)
+			this.net.out.dw[e.action0] = gradAL * isw
 
 			if (descent) {
-				this.net.backward();
-				this.net.configuration.accumulate();
+				this.net.backward()
+				this.net.configuration.accumulate()
 			}
 
-			return gradAL * gradAL * 0.5;
+			return gradAL * gradAL * 0.5
 		}
 
 		// adjust weights etc
-		learn(e) {
-			this.net.configuration.optimize(false);
-			this.targetUpdate();
+		learn() {
+			this.net.configuration.optimize(false)
+			this.targetUpdate()
 		}
+
 
 		targetUpdate() {
 			if (this.options.theta < 1) {
-				this.target.configuration.forEachParameter(this.targetWeightCopy);
+				this.target.configuration.forEachParameter(this.targetWeightCopy)
 			}
 		}
 
 		progressiveCopy(net, param, index) {
-			var _theta = this.options.theta;
+			var _theta = this.options.theta
 			for (var i = 0; i < param.w.length; i++) {
-				param.w[i] = _theta * net.parameters[index].w[i] + (1.0 - _theta) * param.w[i];
+				param.w[i] = _theta * net.parameters[index].w[i] + (1.0 - _theta) * param.w[i]
 			}
 		}
 
+
 		import(params) {
-			this.net.configuration.read(params);
+			if (params.length !== this.net.configuration.countOfParameters)
+				return false
+
+			this.net.configuration.read(params)
+
+			return true
 		}
 
 		export() {
-			return this.net.configuration.write();
+			return this.net.configuration.write()
 		}
 
 	}
@@ -3171,145 +3291,187 @@
 			this.options = Object.assign({
 
 				alpha: 0.1, // advantage learning (AL) http://arxiv.org/pdf/1512.04860v1.pdf; increase action-gap
-				theta: 0.001 }, agent.options);
+				theta: 0.001, // soft target updates
+
+			}, agent.options)
 
 			// networks
-			this.actor = agent.options.actor.newState();
-			this.critic = agent.options.critic.newState();
+			this.actor = agent.options.actor.newState()
+			this.critic = agent.options.critic.newState()
 
 			// target networks
-			this.targetActor = this.actor.model.newState(); // agent.options.target.actor.newState()
-			this.targetCritic = this.critic.model.newState(); // agent.options.target.critic.newState()
+			if (agent.options.targetActor) {
+				if (agent.options.targetActor.model !== this.actor.model)
+					throw 'Target actor model not right';
 
-			this.targetActor.configuration.copyParametersFrom(this.actor.configuration);
-			this.targetCritic.configuration.copyParametersFrom(this.critic.configuration);
+				this.targetActor = agent.options.targetActor.newState()
+			}
+
+			else {
+				this.targetActor = this.actor.model.newState() // agent.options.target.actor.newState()
+			}
+				
+			if (agent.options.targetCritic) {
+				if (agent.options.targetCritic.model !== this.critic.model)
+					throw 'Target critic model not right';
+
+				this.targetCritic = agent.options.targetCritic.newState()
+			}
+
+			else {
+				this.targetCritic = this.critic.model.newState() // agent.options.target.actor.newState()
+			}
+				
+			this.targetActor.configuration.copyParametersFrom(this.actor.configuration)
+			this.targetCritic.configuration.copyParametersFrom(this.critic.configuration)
 
 			// network weight updates
-			this.targetActorUpdate = this.progressiveCopy.bind(this, this.actor.configuration);
-			this.targetCriticUpdate = this.progressiveCopy.bind(this, this.critic.configuration);
+			this.targetActorUpdate = this.progressiveCopy.bind(this, this.actor.configuration)
+			this.targetCriticUpdate = this.progressiveCopy.bind(this, this.critic.configuration)
 
 			// optimizer
 			this.actor.configuration.useOptimizer({
 				type: 'ascent',
 				method: 'adadelta',
 				regularization: { l2: 1e-3 }
-			});
+			})
 
 			this.critic.configuration.useOptimizer({
 				type: 'descent',
 				method: 'adadelta',
-				regularization: { l2: 1e-3 }
-			});
+	            regularization: { l2: 1e-3 }
+			})
 
 			// agent
-			this.agent = agent;
-			this.buffer = agent.buffer;
+			this.agent = agent
+			this.buffer = agent.buffer
 
-			this.states = this.agent.states;
-			this.actions = this.agent.actions;
-			this.input = this.agent.input;
+			this.states = this.agent.states
+			this.actions = this.agent.actions
+			this.input = this.agent.input
 
-			if (this.actor.in.w.length !== this.agent.input) throw 'actor input length insufficient';
+			if (this.actor.in.w.length !== this.agent.input)
+				throw 'actor input length insufficient'
 
-			if (this.critic.in.w.length !== this.agent.input + this.agent.actions) throw 'critic input length insufficient';
+			if (this.critic.in.w.length !== this.agent.input + this.agent.actions)
+				throw 'critic input length insufficient'
 		}
 
 		act(state, target) {
 			if (target) {
-				return this.targetActor.forward(state);
+				return this.targetActor.forward(state)
 			}
 
-			return this.actor.forward(state);
+			return this.actor.forward(state)
 		}
 
 		value(state, action, target) {
-			target = target ? this.targetCritic : this.critic;
+			target = target ? this.targetCritic : this.critic
 
-			target.in.w.set(state, 0);
-			target.in.w.set(action, this.input);
+			target.in.w.set(state, 0)
+			target.in.w.set(action, this.input)
 
-			return target.forward()[0];
+			return target.forward()[0]
 		}
 
 		optimize(e, descent = true) {
-			var target = e.target();
-			var value = e.estimate();
+			var target = e.target()
+			var value = e.estimate()
 
-			var grad = value - target;
-			var gradAL = grad + this.options.alpha * (value - this.agent.evaluate(e.state0, true)); // advantage learning
-			var isw = this.buffer.getImportanceSamplingWeight(e);
+			var grad = value - target
+			var gradAL = grad
 
-			if (descent) {
-				this.critic.backwardWithGradient(gradAL * isw);
-				this.critic.configuration.accumulate();
-				this.teach(e, isw);
+			if (this.options.alpha > 0) {
+				gradAL = grad + this.options.alpha * (value - this.agent.evaluate(e.state0, true)) // advantage learning
 			}
 
-			return 0.5 * gradAL * gradAL; // Math.pow(this.teach(e, isw, descent) - target, 2)
+			if (isNaN(gradAL)) {
+				console.log(target)
+				console.log(value)
+				console.log(grad)
+				console.log(gradAL)
+
+				throw 'NaN'
+
+				return 0.0
+			}
+
+			if (descent) {
+				var isw = this.buffer.getImportanceSamplingWeight(e)
+				this.critic.backwardWithGradient(gradAL * isw)
+				this.critic.configuration.accumulate()
+				this.teach(e, isw)
+			}
+
+			return 0.5 * gradAL * gradAL // Math.pow(this.teach(e, isw, descent) - target, 2)
 		}
 
 		teach(e, isw = 1.0, descent = true) {
-			var action = this.actor.forward(e.state0); // which action to take?
-			var val = this.value(e.state0, action); // how good will the future be, if i take this action?
-			var grad = this.critic.derivatives(0, false); // how will the future change, if i change this action
+			var action = this.actor.forward(e.state0)  // which action to take?
+			var val = this.value(e.state0, action) // how good will the future be, if i take this action?
+			var grad = this.critic.derivatives(0, false) // how will the future change, if i change this action
 
 			for (var i = 0; i < this.options.actions; i++) {
-				this.actor.out.dw[i] = grad[this.input + i] * isw;
+				this.actor.out.dw[i] = grad[this.input + i] * isw
 			}
 
 			if (descent) {
-				this.actor.backward(); // propagate change
-				this.actor.configuration.accumulate();
+				this.actor.backward() // propagate change
+				this.actor.configuration.accumulate()
 			}
 		}
 
-		learn(e) {
+		learn() {
 			// Improve through batch accumuluated gradients
-			this.actor.configuration.optimize(false);
-			this.critic.configuration.optimize(false);
+			this.actor.configuration.optimize(false)
+			this.critic.configuration.optimize(false)
 
 			// Copy actor and critic to target networks slowly
-			this.targetNetworkUpdates();
+			this.targetNetworkUpdates()
 		}
 
 		targetNetworkUpdates() {
-			if (this.options.theta < 1) {
-				this.targetCritic.configuration.forEachParameter(this.targetCriticUpdate);
-				this.targetActor.configuration.forEachParameter(this.targetActorUpdate);
-			}
+			this.targetActor.configuration.forEachParameter(this.targetActorUpdate)
+			this.targetCritic.configuration.forEachParameter(this.targetCriticUpdate)
 		}
 
 		progressiveCopy(net, param, index) {
-			var _theta = this.options.theta;
+			var _theta = this.options.theta
 			for (var i = 0; i < param.w.length; i++) {
-				param.w[i] = _theta * net.parameters[index].w[i] + (1.0 - _theta) * param.w[i];
+				param.w[i] = _theta * net.parameters[index].w[i] + (1.0 - _theta) * param.w[i]
 			}
 		}
 
+
 		import(params) {
-			var a_count = this.actor.configuration.countOfParameters;
-			var c_count = this.critic.configuration.countOfParameters;
+			var a_count = this.actor.configuration.countOfParameters
+			var c_count = this.critic.configuration.countOfParameters
 
-			var actor = params.subarray(0, a_count);
-			var critic = params.subarray(a_count, a_count + c_count);
+			if (params.length !== a_count + c_count)
+				return false;
 
-			this.actor.configuration.read(actor);
-			this.critic.configuration.read(critic);
+			var actor = params.subarray(0, a_count)
+			var critic = params.subarray(a_count, a_count + c_count)
 
-			this.targetActor.configuration.read(actor);
-			this.targetCritic.configuration.read(critic);
+			this.actor.configuration.read(actor)
+			this.critic.configuration.read(critic)
+
+			this.targetActor.configuration.read(actor)
+			this.targetCritic.configuration.read(critic)
+
+			return true;
 		}
 
 		export() {
-			var a_count = this.actor.configuration.countOfParameters;
-			var c_count = this.critic.configuration.countOfParameters;
+			var a_count = this.actor.configuration.countOfParameters
+			var c_count = this.critic.configuration.countOfParameters
 
-			var params = new Float64Array(a_count + c_count);
+			var params = new Float64Array(a_count + c_count)
 
-			params.set(this.actor.configuration.write(), 0);
-			params.set(this.critic.configuration.write(), a_count);
+			params.set(this.actor.configuration.write(), 0)
+			params.set(this.critic.configuration.write(), a_count)
 
-			return params;
+			return params
 		}
 
 	}
@@ -3323,44 +3485,85 @@
 	class WebLoader {
 
 	    static load(path, completion) {
-	        var request = new XMLHttpRequest();
-	        request.open("GET", path, true);
-	        request.responseType = "arraybuffer";
-	        request.addEventListener('load', function (e) {
-	            completion(request.response);
-	        });
+	        var request = new XMLHttpRequest()
+	        request.open("GET", path, true)
+	        request.responseType = "arraybuffer"
+	        request.addEventListener('load', function(e) {
+	            completion(request.response)
+	        })
 
-	        request.send(null);
+	        request.send(null)
 	    }
 
 	    static loadConfig(path, model, completion) {
-	        var config = model.newConfiguration();
-	        WebLoader.loadConfigInto(path, config, completion.bind(null, config));
+	    	var config = model.newConfiguration()
+	    	WebLoader.loadConfigInto(path, config, completion.bind(null, config))
 	    }
 
 	    static loadConfigInto(path, config, completion) {
 	        WebLoader.load(path, function (buffer) {
-	            var weights = new Float64Array(buffer);
-	            config.read(weights);
-	            completion();
-	        });
+	            var weights = new Float64Array(buffer)
+	            config.read(weights)
+	            completion()
+	        })
 	    }
 
+
 	    static loadAgent(path, agent, completion) {
-	        agent.ready = false;
+	        agent.ready = false
 
 	        WebLoader.load(path, function (buffer) {
-	            var weights = new Float64Array(buffer);
-	            agent.import(weights);
-	            agent.ready = true;
+	            var weights = new Float64Array(buffer)
+	            agent.import(weights)
+	            agent.ready = true
 
-	            if (completion) completion(agent);
-	        });
+	            if (completion)
+	                completion(agent)
+	        })
 	    }
 
 	}
 
-	module.exports = WebLoader;
+	module.exports = WebLoader
+
+/***/ },
+/* 34 */
+/***/ function(module, exports) {
+
+	
+	class MultiAgentPool {
+
+		constructor() {
+			this.agents = []
+		}
+
+		add(agent) {
+			agent.pool = this
+			this.agents.push(agent)
+		}
+
+		learn() {
+			this.critic.freeze()
+			this.target.freeze()
+
+			for (var i = 0; i < this.agents.length; i++) {
+				if (this.agents[i].options.startLearningAt > this.agents[i].age)
+					continue 
+
+				this.agents[i].replay()
+
+				if (i === this.agents.length - 1) { // last one
+					this.critic.freeze(false)
+					this.target.freeze(false)
+				}
+
+				this.agents[i].algorithm.learn()
+			}
+		}
+
+	}
+
+	module.exports = MultiAgentPool
 
 /***/ }
 /******/ ]);

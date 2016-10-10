@@ -14,14 +14,16 @@ class Agent {
 
 			type: 'q-learning', // sarsa or q-learning
 			experience: 25e3,
-			discount: opt.discount || 0.98,
-			learningPerTick: 64,
 			temporalWindow: 0,
+
+			learningPerTick: 64,
+			startLearningAt: 1000,
 
 			buffer: Buffers.PrioritizedReplayBuffer,
 
 			algorithm: 'ddpg',
 
+			discount: opt.discount || 0.95,
 			beta: 0.5, // how to prioritise experiences (0 = no prioritisation, 1 = full prioritisation)
 
 		}, opt)
@@ -29,7 +31,7 @@ class Agent {
 		// options
 		this.states = this.options.states // state space
 		this.actions = this.options.actions // action space
-		this.input = this.states + this.options.temporalWindow * (this.states + this.actions) // extended state (over time)
+		this.input = Agent.getInputDimension(this.states, this.actions, this.options.temporalWindow) // extended state (over time)
 
 		// settings
 		this.buffer = new this.options.buffer(this.options.experience)
@@ -136,10 +138,7 @@ class Agent {
 		this.history.rewards.push(reward)
 
 		// Learning happens always one step after actually experiencing
-		if (this.history.states.size < 2) 
-			return
-
-		if (this.learning === false)
+		if (this.history.states.size < 2 || this.learning === false) 
 			return
 
 		// Create new experience
@@ -157,11 +156,21 @@ class Agent {
 		// Get older
 		++this.age 
 
+		if (this.pool)
+			return 0.0
+
+		return this.backward()
+	}
+
+	backward() {
+		if (this.options.startLearningAt > this.age)
+			return false
+
 		// Learn batch
 		var loss = this.replay()
 
 		// Execute algorithm
-		this.algorithm.learn(e)
+		this.algorithm.learn()
  
 		return loss
 	}
@@ -200,7 +209,11 @@ class Agent {
 	}
 
 	import(params) {
-		this.algorithm.import(params)
+		return this.algorithm.import(params)
+	}
+
+	static getInputDimension(states, actions, temporalWindow) {
+		return states + temporalWindow * (states + actions)
 	}
 
 }

@@ -2,8 +2,9 @@ var neuro = require('../../src/framework.js');
 
 var model = new neuro.Network.Model([
     { type: 'input', size: 2 },
-    { type: 'fc', size: 4, activation: 'relu' },
-    { type: 'fc', size: 1, activation: 'sigmoid' }
+    { type: 'fc', size: 10, activation: 'relu' },
+    { type: 'fc', size: 10, activation: 'relu' },
+    { type: 'fc', size: 1, activation: 'sigmoid' },
 ]);
 
 model.numericalGradientCheck()
@@ -31,7 +32,7 @@ for (var i = 0; i < 5e6; i++) {
 	config.optimize()
 
 	if (i % 10000 === 0) {
-		console.log('loss ' + l / 10000 + '; correct ' + correct + ' of 10000; iter' + i)
+		console.log('loss ' + l / 10000 + '; correct ' + correct + ' of 10000; iteration ' + i)
 		l = 0.0
 		correct = 0.0
 	}

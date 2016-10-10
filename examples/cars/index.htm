@@ -23,7 +23,12 @@
 		<p><strong>Click and drag to draw shapes, which must be avoided by the cars.</strong></p>
 		<button onclick="window.gcd.goSlow();">Go slow</button>
 		<button onclick="window.gcd.goFast();">Go fast</button><br>
+		<input type='file' accept='*/*' onchange='readBrain(event)'><br>
+		<p>Agent's lifespan: <span id="agent-age">0</span>s</p>
 	</div>
+
+	<div id="container" style="width: 100%; max-width: 1200px; margin: 0 auto"></div>
+
 	<script type="text/javascript" src="vendor/p2.min.js"></script> <!-- physics lib -->
 	<script type="text/javascript" src="vendor/pixi.min.js"></script> <!-- WebGL renderer -->
 	<script type="text/javascript" src="../../build/neurojs-v2.js"></script>  <!-- brain lib :P -->

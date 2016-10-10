@@ -1,7 +1,7 @@
 var car = require('./car.js');
 
-function agent() {
-    this.car = new car({});
+function agent(world) {
+    this.car = new car(world, {});
     this.init();
 };
 

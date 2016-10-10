@@ -2,7 +2,7 @@ var color = require('./color.js'),
     sensors = require('./sensors.js'),
     tc = require('./tiny-color.js');
 
-function car(opt) {
+function car(world, opt) {
     this.options = {
         sensors: [
 
@@ -34,14 +34,17 @@ function car(opt) {
         ]
     };
 
-    this.maxSteer = opt.maxSteer || Math.PI / 5;
-    this.maxEngineForce = opt.maxEngineForce || 4;
-    this.maxBrakeForce = opt.maxBrakeForce || 5;
-    this.maxBackwardForce = opt.maxBackwardForce || 2;
+    this.maxSteer = Math.PI / 7;
+    this.maxEngineForce = 10;
+    this.maxBrakeForce = 5;
+    this.maxBackwardForce = 2;
+    this.linearDamping = 0.5;
 
     this.continuous = true
-    this.frequency = 10
+    this.frequency = 15
     this.discount = .75
+
+    this.world = world
 
     this.init();
 };
@@ -72,20 +75,22 @@ car.prototype.createBrain = function () {
         var actions = 2
         var temporal = 1
 
-        var input = states + (states + actions) * temporal
+        var input = window.neurojs.Agent.getInputDimension(states, actions, temporal)
 
-        if(!car.actor)
+        if(!car.actor) {
             car.actor = new window.neurojs.Network.Model([
 
                 { type: 'input', size: input },
-                { type: 'fc', size: 60, activation: 'relu' },
-                { type: 'fc', size: 60, activation: 'relu', dropout: 0.4 },
+                { type: 'fc', size: 40, activation: 'relu' },
+                { type: 'fc', size: 40, activation: 'relu' },
+                { type: 'fc', size: 40, activation: 'relu', dropout: 0.5 },
                 { type: 'fc', size: actions, activation: 'tanh' },
                 { type: 'regression' }
 
             ])
+        }
 
-        if(!car.critic)
+        if(!car.critic) {
             car.critic = new window.neurojs.Network.Model([
 
                 { type: 'input', size: input + actions },
@@ -95,13 +100,22 @@ car.prototype.createBrain = function () {
                 { type: 'regression' }
 
             ]).newConfiguration()
+            this.world.pool.critic = car.critic
+        }
 
-        var exp_size = 3600 * this.frequency // store one hour of memories
+        if(!car.target) {
+            car.target = car.critic.model.newConfiguration()
+            this.world.pool.target = car.target
+        }
+
+        var exp_size = 5000 * this.frequency
 
         this.brain = new window.neurojs.Agent({
 
             actor: car.actor.newConfiguration(),
             critic: car.critic,
+
+            targetCritic: car.target,
 
             states: states,
             actions: actions,
@@ -110,15 +124,19 @@ car.prototype.createBrain = function () {
 
             temporalWindow: temporal, 
 
-            discount: Math.pow(this.discount, 1.0 / this.frequency),
+            discount: 0.98, // Math.pow(this.discount, 1.0 / this.frequency),
 
             experience: exp_size, 
-            learningPerTick: Math.floor(640 / this.frequency), 
+            learningPerTick: 50, 
+            startLearningAt: 5000,
 
-            theta: 0.01 / this.frequency,
+            theta: 0.001,
+
+            alpha: 0.1
 
         })
 
+        // this.world.pool.add(this.brain)
         // window.neurojs.Loader.loadAgent('checkpoint/car-ddpg-1-age75000.bin', this.brain)
 
     }
@@ -128,7 +146,7 @@ car.prototype.createBrain = function () {
         var actions = car.actions.length
         var temporal = 1
 
-        var input = states + (states + actions) * temporal
+        var input = window.neurojs.Agent.getInputDimension(states, actions, temporal)
 
         var net = new window.neurojs.Network.Model([
 
@@ -170,6 +188,7 @@ car.prototype.createPhysicalBody = function () {
     this.wheels = {}
     this.chassisBody.color = color.randomPastelHex();
     this.chassisBody.car = true;
+    this.chassisBody.damping = this.linearDamping;
 
     var boxShape = new p2.Box({ width: 0.5, height: 1 });
     boxShape.entity = 2
@@ -229,13 +248,13 @@ car.prototype.createPhysicalBody = function () {
     this.frontWheel = this.vehicle.addWheel({
         localPosition: [0, 0.5] // front
     });
-    this.frontWheel.setSideFriction(6);
+    this.frontWheel.setSideFriction(50);
 
     // Back wheel
     this.backWheel = this.vehicle.addWheel({
         localPosition: [0, -0.5] // back
     });
-    this.backWheel.setSideFriction(6); // Less side friction on back wheel makes it easier to drift
+    this.backWheel.setSideFriction(45); // Less side friction on back wheel makes it easier to drift
 };
 
 car.prototype.update = function (dt) {
@@ -261,9 +280,13 @@ car.prototype.updateBrain = function (dt) {
     if (this.timer >= 1.0 / this.frequency) {
         var d = this.updateSensors()
 
-        this.brain.learn(
-            Math.pow(this.chassisBody.velocity[1], 2) - 0.4 * Math.pow(this.chassisBody.velocity[0], 2) - this.punishment
-        )
+        var r = Math.pow(this.chassisBody.velocity[1], 2) - 0.4 * Math.pow(this.chassisBody.velocity[0], 2) - this.punishment
+
+        if (Math.abs(this.speed.velocity) < 1e-2) { // punish no movement; it harms exploration
+            r -= 1.0 
+        }
+
+        this.brain.learn(r)
 
         if (this.continuous) {
             this.action = this.brain.policy(d)
@@ -295,11 +318,11 @@ car.prototype.drawSensors = function () {
     }
 };
 
-car.prototype.addToWorld = function (world) {
-    world.addBody(this.chassisBody);
-    this.vehicle.addToWorld(world);
+car.prototype.addToWorld = function () {
+    this.world.p2.addBody(this.chassisBody);
+    this.vehicle.addToWorld(this.world.p2);
 
-   world.on("beginContact",(function(event){
+   this.world.p2.on("beginContact",(function(event){
     if (event.bodyA === this.chassisBody || event.bodyB === this.chassisBody)
         this.punishment = 50; 
    }).bind(this));
@@ -355,8 +378,8 @@ car.prototype.handle = function (throttle, handlebar) {
         this.backWheel.engineForce = force
     }
 
-    this.wheels.topLeft.rotation = this.frontWheel.steerValue * 0.5
-    this.wheels.topRight.rotation = this.frontWheel.steerValue * 0.5
+    this.wheels.topLeft.rotation = this.frontWheel.steerValue * 0.7071067812
+    this.wheels.topRight.rotation = this.frontWheel.steerValue * 0.7071067812
 };
 
 module.exports = car;

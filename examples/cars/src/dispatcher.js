@@ -39,12 +39,7 @@ dispatcher.prototype.loop = function () {
         requestAnimFrame(this.__loop);
     }
 
-    var dt;
-
-    if (!this.interval)
-        dt = this.dt();
-    else 
-        dt = 1.0 / 60.0
+    var dt = 1.0 / 60.0
 
     // compute phyiscs
     this.world.step(dt);

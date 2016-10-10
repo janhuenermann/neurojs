@@ -6,22 +6,31 @@ function renderer(world, container) {
         this.add_body(e.body);
     }).bind(this));
 
-    container = container || document.body
+    if (container) {
+        this.elementContainer = container
+    }
 
-    this.elementContainer = document.createElement("div");
-    this.elementContainer.style.width = "100%";
-    this.elementContainer.style.height = "100%";
-    container.appendChild(this.elementContainer);
+    else {
+        this.elementContainer = document.createElement("div");
+        this.elementContainer.style.width = "100%";
+        // this.elementContainer.style.height = "100%";
+        document.body.appendChild(this.elementContainer)
+    }
 
     this.pixelRatio = window.devicePixelRatio || 1;
 
     this.pixi = new PIXI.autoDetectRenderer(0, 0, {
         antialias: true,
-        resolution: this.pixelRatio
+        resolution: this.pixelRatio,
+        transparent: true
     }, false);
-    this.pixi.backgroundColor = 0xFFFFFF;
+    // this.pixi.backgroundColor = 0xFFFFFF;
 
-    this.stage = new PIXI.Container();
+    this.stage = new PIXI.Container()
+    this.container = new PIXI.DisplayObjectContainer()
+
+    this.stage.addChild(this.container)
+
     this.drawPoints = []
 
     this.elementContainer.addEventListener("mousedown", (function (e) {
@@ -51,7 +60,7 @@ function renderer(world, container) {
     this.adjustBounds();
 
     this.drawingGraphic = new PIXI.Graphics()
-    this.stage.addChild(this.drawingGraphic)
+    this.container.addChild(this.drawingGraphic)
 };
 
 renderer.prototype.events = {};
@@ -69,11 +78,20 @@ renderer.prototype.mousePositionFromEvent = function (e) {
 
 
 renderer.prototype.adjustBounds = function () {
-    var rect = this.elementContainer.getBoundingClientRect();
-    this.viewport.width = rect.width;
-    this.viewport.height = rect.height;
+    var outerW = this.elementContainer.offsetWidth
+    var outerH = outerW / 3 * 2
 
-    this.pixi.resize(this.viewport.width, this.viewport.height);
+    this.viewport.width = outerW
+    this.viewport.height = outerH
+    this.viewport.scale = outerW / 1200 * 35
+
+    this.offset = this.pixi.view.getBoundingClientRect()
+    this.offset = {
+        top: this.offset.top + document.body.scrollTop,
+        left: this.offset.left + document.body.scrollLeft
+    }
+
+    this.pixi.resize(this.viewport.width, this.viewport.height)
  };
 
 renderer.prototype.render = function () {

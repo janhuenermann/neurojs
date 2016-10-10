@@ -59,6 +59,10 @@ class FullyConnectedLayer {
 		var elements = (1 - dropout) * (this.dimensions.input.length + this.dimensions.output.length)
 		var scale = Math.sqrt(2.0 / elements)
 		params.w.randn(0.0, scale)
+
+		if (this.options.customInit) {
+			this.options.customInit(params.w);
+		}
 	}
 
 }

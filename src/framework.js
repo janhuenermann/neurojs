@@ -7,7 +7,9 @@ var neurojs = {
 	Network: require('./network.js'),
 	Agent: require('./rl/agent.js'),
 	Optim: require('./optim.js'),
-	Loader: require('./loader.js')
+	Loader: require('./loader.js'),
+	Buffers: require('./rl/replay-buffers.js'),
+	MultiAgentPool: require('./rl/multi-agent-pool.js')
 
 }
 

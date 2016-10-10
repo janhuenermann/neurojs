@@ -72,12 +72,14 @@ distanceSensor.prototype.read = function () {
 
 function speedSensor(car, opt) {
 	this.car = car;
+	this.local = p2.vec2.create();
 }
 
 speedSensor.prototype.dimensions = 1
 
 speedSensor.prototype.update = function () {
-	this.velocity = p2.vec2.len(this.car.chassisBody.velocity);
+	this.car.chassisBody.vectorToLocalFrame(this.local, this.car.chassisBody.velocity);
+	this.velocity = p2.vec2.len(this.car.chassisBody.velocity) * (this.local[1] > 0 ? 1.0 : -1.0);
 };
 
 speedSensor.prototype.draw = function (g) {
@@ -88,6 +90,7 @@ speedSensor.prototype.draw = function (g) {
 	}
 
 	g.__label.text = Math.floor(this.velocity * 3.6) + ' km/h';
+	g.__label.rotation = -this.car.chassisBody.interpolatedAngle;
 };
 
 speedSensor.prototype.read = function () {
