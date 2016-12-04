@@ -53,13 +53,18 @@ car.TYPE = 2
 
 car.prototype.init = function () {
     this.createPhysicalBody()
+
+    this.dynamicForwardSensor = false
+
     this.sensors = sensors.build(this, this.options.sensors)
     this.speed = this.sensors[this.sensors.length - 1]
+    
 
     this.createBrain()
 
     this.punishment = 0
     this.timer = 0.0
+    
 };
 
 car.prototype.createBrain = function () {
@@ -72,7 +77,7 @@ car.prototype.createBrain = function () {
 
     if (this.continuous) {
 
-        var actions = 2
+        var actions = 2 + (this.dynamicForwardSensor ? 1 : 0)
         var temporal = 1
 
         var input = window.neurojs.Agent.getInputDimension(states, actions, temporal)
@@ -94,6 +99,7 @@ car.prototype.createBrain = function () {
             car.critic = new window.neurojs.Network.Model([
 
                 { type: 'input', size: input + actions },
+                { type: 'fc', size: 50, activation: 'relu' },
                 { type: 'fc', size: 50, activation: 'relu' },
                 { type: 'fc', size: 50, activation: 'relu' },
                 { type: 'fc', size: 1 },
@@ -175,6 +181,8 @@ car.prototype.createBrain = function () {
 
     }
 
+    this.states = states
+
 };
 
 car.prototype.createPhysicalBody = function () {
@@ -253,8 +261,8 @@ car.prototype.createPhysicalBody = function () {
     // Back wheel
     this.backWheel = this.vehicle.addWheel({
         localPosition: [0, -0.5] // back
-    });
-    this.backWheel.setSideFriction(45); // Less side friction on back wheel makes it easier to drift
+    })
+    this.backWheel.setSideFriction(45) // Less side friction on back wheel makes it easier to drift
 };
 
 car.prototype.update = function (dt) {
@@ -262,15 +270,19 @@ car.prototype.update = function (dt) {
 };
 
 car.prototype.updateSensors = function () {
-    var data = []
-    for (var i = 0; i < this.sensors.length; i++) {
+    var data = new Float64Array(this.states)
+    for (var i = 0, k = 0; i < this.sensors.length; k += this.sensors[i].dimensions, i++) {
         this.sensors[i].update()
-        data[i] = this.sensors[i].read()
+        data.set(this.sensors[i].read(), k)
+    }
+
+    if (k !== this.states) {
+        throw 'unexpected';
     }
 
     this.drawSensors()
 
-    return Array.prototype.concat.apply([], data)
+    return data
 };
 
 car.actions = [ [ 0, -1 ], [ 0, +1 ], [ 1, -1 ], [ 1, +1 ], [ -1, -1 ], [ -1, +1 ], [ 1, 0 ], [ -1, 0 ], [ 0, 0 ] ]
@@ -280,7 +292,9 @@ car.prototype.updateBrain = function (dt) {
     if (this.timer >= 1.0 / this.frequency) {
         var d = this.updateSensors()
 
-        var r = Math.pow(this.chassisBody.velocity[1], 2) - 0.4 * Math.pow(this.chassisBody.velocity[0], 2) - this.punishment
+        var r = Math.pow(this.chassisBody.velocity[1], 2)
+             - 0.3 * Math.pow(this.chassisBody.velocity[0], 2)
+             - this.punishment;
 
         if (Math.abs(this.speed.velocity) < 1e-2) { // punish no movement; it harms exploration
             r -= 1.0 
@@ -296,8 +310,12 @@ car.prototype.updateBrain = function (dt) {
             var action_idx = this.brain.policy(d)
             this.action = car.actions[action_idx]
         }
-        
 
+        if (this.dynamicForwardSensor) {
+            this.sensors[0].updateLength((0.5 + 0.5 * this.action[2]) * 25)
+            this.sensors[0].highlighted = true
+        }
+        
         this.timer = 0.0
         this.punishment = 0.0
     }
@@ -324,7 +342,7 @@ car.prototype.addToWorld = function () {
 
    this.world.p2.on("beginContact",(function(event){
     if (event.bodyA === this.chassisBody || event.bodyB === this.chassisBody)
-        this.punishment = 50; 
+        this.punishment = Math.max(5 * Math.pow(this.chassisBody.velocity[1], 2), 50.0); 
    }).bind(this));
 };
 

@@ -4,7 +4,7 @@ function boot() {
     this.world = new app.world();
     this.renderer = new app.renderer(this.world, document.getElementById("container"));
 
-    this.world.init(4);
+    this.world.init(4, this.renderer);
 
     this.dispatcher = new app.dispatcher(this.renderer, this.world);
     this.dispatcher.begin();

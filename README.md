@@ -1,3 +1,5 @@
+![](examples/cars/images/screenshot.png)
+
 # neurojs - A machine learning framework for browsers
 - Implements a full-stack neural-network based machine learning framework
 - Extended reinforcement-learning support

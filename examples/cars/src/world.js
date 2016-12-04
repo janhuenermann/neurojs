@@ -36,10 +36,14 @@ world.prototype.addWall = function (start, end, width) {
         mass : 0.0,
         position : pos
     });
+
     var rectangleShape = new p2.Box({ width: w, height:  h });
-    rectangleShape.color = parseInt('DD' + 'DD' + 'DD', 16)
+    // rectangleShape.color = 0xFFFFFF
+    b.hidden = true;
     b.addShape(rectangleShape);
     this.p2.addBody(b);
+
+    return b;
 }
 
 world.prototype.addPolygons = function (polys) {
@@ -57,17 +61,26 @@ world.prototype.addPolygons = function (polys) {
     
 }
 
-world.prototype.init = function (n) {
+world.prototype.init = function (n, renderer) {
     for (var i = 0; i < n; i++) {
         var ag = new agent(this);
         ag.car.addToWorld();
         this.agents.push(ag);
     }
 
-    this.addWall( [ -16.571428571428573, -10.671428571428573 ], [ -16.571428571428573, 10.671428571428573 ], 0.5 )
-    this.addWall( [ 16.571428571428573, -10.671428571428573 ], [ 16.571428571428573, 10.671428571428573 ], 0.5 )
-    this.addWall( [ -16.571428571428573, -10.671428571428573 ], [ 16.571428571428573, -10.671428571428573 ], 0.5 )
-    this.addWall( [ -16.571428571428573, 10.671428571428573 ], [ 16.571428571428573, 10.671428571428573 ], 0.5 )
+    window.addEventListener('resize', this.resize.bind(this, renderer), false);
+
+    var w = renderer.viewport.width / renderer.viewport.scale
+    var h = renderer.viewport.height / renderer.viewport.scale
+    var wx = w / 2, hx = h / 2
+
+    this.addWall( [ -wx - 0.25, -hx ], [ -wx - 0.25, hx ], 0.5 )
+    this.addWall( [ wx + 0.25, -hx ], [ wx + 0.25, hx ], 0.5 )
+    this.addWall( [ -wx, -hx - 0.25 ], [ wx, -hx - 0.25 ], 0.5 )
+    this.addWall( [ -wx, hx + 0.25 ], [ wx, hx + 0.25 ], 0.5 )
+};
+
+world.prototype.resize = function (renderer) {
 };
 
 world.prototype.step = function (dt) {

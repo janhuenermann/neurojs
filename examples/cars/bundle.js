@@ -50,7 +50,7 @@
 	    this.world = new app.world();
 	    this.renderer = new app.renderer(this.world, document.getElementById("container"));
 
-	    this.world.init(4);
+	    this.world.init(4, this.renderer);
 
 	    this.dispatcher = new app.dispatcher(this.renderer, this.world);
 	    this.dispatcher.begin();
@@ -210,13 +210,18 @@
 
 	car.prototype.init = function () {
 	    this.createPhysicalBody()
+
+	    this.dynamicForwardSensor = false
+
 	    this.sensors = sensors.build(this, this.options.sensors)
 	    this.speed = this.sensors[this.sensors.length - 1]
+	    
 
 	    this.createBrain()
 
 	    this.punishment = 0
 	    this.timer = 0.0
+	    
 	};
 
 	car.prototype.createBrain = function () {
@@ -229,7 +234,7 @@
 
 	    if (this.continuous) {
 
-	        var actions = 2
+	        var actions = 2 + (this.dynamicForwardSensor ? 1 : 0)
 	        var temporal = 1
 
 	        var input = window.neurojs.Agent.getInputDimension(states, actions, temporal)
@@ -251,6 +256,7 @@
 	            car.critic = new window.neurojs.Network.Model([
 
 	                { type: 'input', size: input + actions },
+	                { type: 'fc', size: 50, activation: 'relu' },
 	                { type: 'fc', size: 50, activation: 'relu' },
 	                { type: 'fc', size: 50, activation: 'relu' },
 	                { type: 'fc', size: 1 },
@@ -332,6 +338,8 @@
 
 	    }
 
+	    this.states = states
+
 	};
 
 	car.prototype.createPhysicalBody = function () {
@@ -410,8 +418,8 @@
 	    // Back wheel
 	    this.backWheel = this.vehicle.addWheel({
 	        localPosition: [0, -0.5] // back
-	    });
-	    this.backWheel.setSideFriction(45); // Less side friction on back wheel makes it easier to drift
+	    })
+	    this.backWheel.setSideFriction(45) // Less side friction on back wheel makes it easier to drift
 	};
 
 	car.prototype.update = function (dt) {
@@ -419,15 +427,19 @@
 	};
 
 	car.prototype.updateSensors = function () {
-	    var data = []
-	    for (var i = 0; i < this.sensors.length; i++) {
+	    var data = new Float64Array(this.states)
+	    for (var i = 0, k = 0; i < this.sensors.length; k += this.sensors[i].dimensions, i++) {
 	        this.sensors[i].update()
-	        data[i] = this.sensors[i].read()
+	        data.set(this.sensors[i].read(), k)
+	    }
+
+	    if (k !== this.states) {
+	        throw 'unexpected';
 	    }
 
 	    this.drawSensors()
 
-	    return Array.prototype.concat.apply([], data)
+	    return data
 	};
 
 	car.actions = [ [ 0, -1 ], [ 0, +1 ], [ 1, -1 ], [ 1, +1 ], [ -1, -1 ], [ -1, +1 ], [ 1, 0 ], [ -1, 0 ], [ 0, 0 ] ]
@@ -437,7 +449,9 @@
 	    if (this.timer >= 1.0 / this.frequency) {
 	        var d = this.updateSensors()
 
-	        var r = Math.pow(this.chassisBody.velocity[1], 2) - 0.4 * Math.pow(this.chassisBody.velocity[0], 2) - this.punishment
+	        var r = Math.pow(this.chassisBody.velocity[1], 2)
+	             - 0.3 * Math.pow(this.chassisBody.velocity[0], 2)
+	             - this.punishment;
 
 	        if (Math.abs(this.speed.velocity) < 1e-2) { // punish no movement; it harms exploration
 	            r -= 1.0 
@@ -453,8 +467,12 @@
 	            var action_idx = this.brain.policy(d)
 	            this.action = car.actions[action_idx]
 	        }
-	        
 
+	        if (this.dynamicForwardSensor) {
+	            this.sensors[0].updateLength((0.5 + 0.5 * this.action[2]) * 25)
+	            this.sensors[0].highlighted = true
+	        }
+	        
 	        this.timer = 0.0
 	        this.punishment = 0.0
 	    }
@@ -481,7 +499,7 @@
 
 	   this.world.p2.on("beginContact",(function(event){
 	    if (event.bodyA === this.chassisBody || event.bodyB === this.chassisBody)
-	        this.punishment = 50; 
+	        this.punishment = Math.max(5 * Math.pow(this.chassisBody.velocity[1], 2), 50.0); 
 	   }).bind(this));
 	};
 
@@ -585,29 +603,45 @@
 		this.angle = opt.angle / 180 * Math.PI;
 		this.length = opt.length || 10;
 
-		this.direction = [ Math.sin(this.angle), Math.cos(this.angle) ];
-		this.start = opt.start || [ 0, 0.1 ];
-		this.end = [ this.start[0] + this.direction[0] * this.length, this.start[1] + this.direction[1] * this.length ];
+		this.direction = [ Math.sin(this.angle), Math.cos(this.angle) ]
+		this.start = opt.start || [ 0, 0.1 ]
 
-	    this.localNormal = p2.vec2.create();
+	    this.localNormal = p2.vec2.create()
+	    this.globalRay = p2.vec2.create()
+
 	    this.ray = new p2.Ray({
 	        mode: p2.Ray.CLOSEST,
 	        direction: this.direction,
 	        length: this.length,
 	        checkCollisionResponse: false,
 	        skipBackfaces: true
-	    });
+	    })
 
-	    this.castedResult = new p2.RaycastResult();
-	    this.setDefault();
+	    this.updateLength(this.length);
+
+	    this.castedResult = new p2.RaycastResult()
+	    this.hit = false
+	    this.setDefault()
+
+	    this.data = new Float64Array(this.dimensions);
+	    this.highlighted = false
 	}
 
-	distanceSensor.prototype.dimensions = 4
+	distanceSensor.prototype.dimensions = 3
+
+	distanceSensor.prototype.updateLength = function (v) {
+		this.length = v
+		this.ray.length = this.length
+		this.end = [ this.start[0] + this.direction[0] * this.length, this.start[1] + this.direction[1] * this.length ]
+		this.rayVector = [ this.end[0] - this.start[0], this.end[1] - this.start[1] ]
+	};
 
 	distanceSensor.prototype.setDefault = function () {
-		this.normal = [ 0, 0 ]
-	    this.distance = 1.0
-	    this.entity = 0
+		this.distance = 1.0
+		this.entity = 0
+		this.localNormal[0] = 0
+		this.localNormal[1] = 0
+		this.reflectionAngle = 0
 	};
 
 	distanceSensor.prototype.update = function () {
@@ -623,15 +657,17 @@
 
 	    vehicleBody.world.raycast(this.castedResult, this.ray);
 
-	    if (this.castedResult.hasHit()) {
+	    if (this.hit = this.castedResult.hasHit()) {
 	    	this.distance = this.castedResult.fraction
+	    	this.entity = this.castedResult.shape.entity
+
 	    	vehicleBody.vectorToLocalFrame(this.localNormal, this.castedResult.normal)
+	    	vehicleBody.vectorToWorldFrame(this.globalRay, this.rayVector)
 
-	    	this.normal[0] = this.localNormal[0]
-	    	this.normal[1] = this.localNormal[1]
-
-	    	this.entity = this.castedResult.shape.entity || 1
-	    }
+	    	this.reflectionAngle = Math.atan2( this.castedResult.normal[1], this.castedResult.normal[0] ) - Math.atan2( this.globalRay[1], this.globalRay[0] ) // = Math.atan2( this.localNormal[1], this.localNormal[0] ) - Math.atan2( this.rayVector[1], this.rayVector[0] )	
+	    	if (this.reflectionAngle > Math.PI / 2) this.reflectionAngle = Math.PI - this.reflectionAngle
+	    	if (this.reflectionAngle < -Math.PI / 2) this.reflectionAngle = Math.PI + this.reflectionAngle
+	    } 
 
 	    else {
 	    	this.setDefault();
@@ -639,27 +675,40 @@
 	};
 
 	distanceSensor.prototype.draw = function (g) {
-		g.lineStyle(0.01, color.rgbToHex(Math.floor((1-this.distance) * 255), Math.floor((this.distance) * 128), 128), 0.5);
+		var dist = this.distance
+		var c = color.rgbToHex(Math.floor((1-this.distance) * 255), Math.floor((this.distance) * 128), 128)
+		g.lineStyle(this.highlighted ? 0.04 : 0.01, c, 0.5)
 		g.moveTo(this.start[0], this.start[1]);
-		g.lineTo(this.start[0] + this.direction[0] * this.length * this.distance, this.start[1] + this.direction[1] * this.length * this.distance);
+		g.lineTo(this.start[0] + this.direction[0] * this.length * dist, this.start[1] + this.direction[1] * this.length * dist);
 	};
 
 	distanceSensor.prototype.read = function () {
-		return [ 1.0 - this.distance, this.entity ].concat(this.normal)
+		if (this.hit) {
+			this.data[0] = 1.0 - this.distance
+			this.data[1] = this.reflectionAngle
+			this.data[2] = this.entity === 2 ? 1.0 : 0.0 // is car?
+		}
+
+		else {
+			this.data.fill(0.0)
+		}
+
+		return this.data
 	};
 
 
 
 	function speedSensor(car, opt) {
-		this.car = car;
-		this.local = p2.vec2.create();
+		this.car = car
+		this.local = p2.vec2.create()
+		this.data = new Float64Array(this.dimensions)
 	}
 
 	speedSensor.prototype.dimensions = 1
 
 	speedSensor.prototype.update = function () {
-		this.car.chassisBody.vectorToLocalFrame(this.local, this.car.chassisBody.velocity);
-		this.velocity = p2.vec2.len(this.car.chassisBody.velocity) * (this.local[1] > 0 ? 1.0 : -1.0);
+		this.car.chassisBody.vectorToLocalFrame(this.local, this.car.chassisBody.velocity)
+		this.velocity = p2.vec2.len(this.car.chassisBody.velocity) * (this.local[1] > 0 ? 1.0 : -1.0)
 	};
 
 	speedSensor.prototype.draw = function (g) {
@@ -674,7 +723,9 @@
 	};
 
 	speedSensor.prototype.read = function () {
-		return [this.velocity];
+		this.data[0] = this.velocity
+
+		return this.data
 	}
 
 
@@ -693,6 +744,10 @@
 
 	function build(car, config) {
 		var out = [];
+
+		if (car.dynamicForwardSensor) {
+			config = config.splice(0, 0, { type: 'distance', angle: +0, length: 0 });
+		}
 
 		for (var i = 0; i < config.length; i++) {
 			var sensor = create(car, config[i]);
@@ -2129,6 +2184,7 @@
 
 	    this.pixi.view.style.width = "100%";
 	    this.pixi.view.style.height = "100%";
+	    this.pixi.view.style.outline = "5px solid #EEE";
 	    this.elementContainer.appendChild(this.pixi.view);
 
 	    this.bodies = [];
@@ -2196,6 +2252,7 @@
 	};
 
 	renderer.prototype.create_sprite = function (body) {
+
 	    var sprite = new PIXI.Graphics();
 
 	    this.draw_sprite(body, sprite);
@@ -2257,7 +2314,7 @@
 	    var color = body.color
 	    var opt = {
 	        line: { color: color, alpha: 1, width: 0.01 },
-	        fill: { color: color, alpha: 0.7 }
+	        fill: { color: color, alpha: 1.0 }
 	    }
 
 	    if(body.concavePath){
@@ -2282,7 +2339,7 @@
 	        if (shape.color) {
 	            shape_opt = {
 	                line: { color: shape.color, alpha: 1, width: 0.01 },
-	                fill: { color: shape.color, alpha: 0.7 }
+	                fill: { color: shape.color, alpha: 1.0 }
 	            }
 	        }
 
@@ -2303,11 +2360,10 @@
 	};  
 
 	renderer.prototype.add_body = function (body) {
-	    if (body instanceof p2.Body && body.shapes.length) {
+	    if (body instanceof p2.Body && body.shapes.length && !body.hidden) {
 	        body.gl_sprite = this.create_sprite(body);
 	        this.update_body(body);
 	        this.bodies.push(body);
-
 	    }
 	};
 
@@ -2399,10 +2455,14 @@
 	        mass : 0.0,
 	        position : pos
 	    });
+
 	    var rectangleShape = new p2.Box({ width: w, height:  h });
-	    rectangleShape.color = parseInt('DD' + 'DD' + 'DD', 16)
+	    // rectangleShape.color = 0xFFFFFF
+	    b.hidden = true;
 	    b.addShape(rectangleShape);
 	    this.p2.addBody(b);
+
+	    return b;
 	}
 
 	world.prototype.addPolygons = function (polys) {
@@ -2420,17 +2480,26 @@
 	    
 	}
 
-	world.prototype.init = function (n) {
+	world.prototype.init = function (n, renderer) {
 	    for (var i = 0; i < n; i++) {
 	        var ag = new agent(this);
 	        ag.car.addToWorld();
 	        this.agents.push(ag);
 	    }
 
-	    this.addWall( [ -16.571428571428573, -10.671428571428573 ], [ -16.571428571428573, 10.671428571428573 ], 0.5 )
-	    this.addWall( [ 16.571428571428573, -10.671428571428573 ], [ 16.571428571428573, 10.671428571428573 ], 0.5 )
-	    this.addWall( [ -16.571428571428573, -10.671428571428573 ], [ 16.571428571428573, -10.671428571428573 ], 0.5 )
-	    this.addWall( [ -16.571428571428573, 10.671428571428573 ], [ 16.571428571428573, 10.671428571428573 ], 0.5 )
+	    window.addEventListener('resize', this.resize.bind(this, renderer), false);
+
+	    var w = renderer.viewport.width / renderer.viewport.scale
+	    var h = renderer.viewport.height / renderer.viewport.scale
+	    var wx = w / 2, hx = h / 2
+
+	    this.addWall( [ -wx - 0.25, -hx ], [ -wx - 0.25, hx ], 0.5 )
+	    this.addWall( [ wx + 0.25, -hx ], [ wx + 0.25, hx ], 0.5 )
+	    this.addWall( [ -wx, -hx - 0.25 ], [ wx, -hx - 0.25 ], 0.5 )
+	    this.addWall( [ -wx, hx + 0.25 ], [ wx, hx + 0.25 ], 0.5 )
+	};
+
+	world.prototype.resize = function (renderer) {
 	};
 
 	world.prototype.step = function (dt) {

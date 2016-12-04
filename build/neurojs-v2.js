@@ -2617,7 +2617,10 @@
 	var DQN = __webpack_require__(31)
 	var DDPG = __webpack_require__(32)
 
-
+	/**
+	 * The Agent class represents the
+	 * reinforcement-learner.
+	 */
 	class Agent {
 
 		constructor(opt) {
@@ -2738,7 +2741,7 @@
 		}
 
 		/**
-		 * Adds an experience to the buffer and replays an batch of experiences
+		 * Adds an experience to the buffer and replays a batch of experiences
 		 * @param  {Float} reward
 		 * @return {Float}        The loss
 		 */

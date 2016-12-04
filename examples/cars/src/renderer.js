@@ -50,6 +50,7 @@ function renderer(world, container) {
 
     this.pixi.view.style.width = "100%";
     this.pixi.view.style.height = "100%";
+    this.pixi.view.style.outline = "5px solid #EEE";
     this.elementContainer.appendChild(this.pixi.view);
 
     this.bodies = [];
@@ -117,6 +118,7 @@ renderer.prototype.update_body = function (body) {
 };
 
 renderer.prototype.create_sprite = function (body) {
+
     var sprite = new PIXI.Graphics();
 
     this.draw_sprite(body, sprite);
@@ -178,7 +180,7 @@ renderer.prototype.draw_sprite = function (body, sprite) {
     var color = body.color
     var opt = {
         line: { color: color, alpha: 1, width: 0.01 },
-        fill: { color: color, alpha: 0.7 }
+        fill: { color: color, alpha: 1.0 }
     }
 
     if(body.concavePath){
@@ -203,7 +205,7 @@ renderer.prototype.draw_sprite = function (body, sprite) {
         if (shape.color) {
             shape_opt = {
                 line: { color: shape.color, alpha: 1, width: 0.01 },
-                fill: { color: shape.color, alpha: 0.7 }
+                fill: { color: shape.color, alpha: 1.0 }
             }
         }
 
@@ -224,11 +226,10 @@ renderer.prototype.draw_sprite = function (body, sprite) {
 };  
 
 renderer.prototype.add_body = function (body) {
-    if (body instanceof p2.Body && body.shapes.length) {
+    if (body instanceof p2.Body && body.shapes.length && !body.hidden) {
         body.gl_sprite = this.create_sprite(body);
         this.update_body(body);
         this.bodies.push(body);
-
     }
 };
 
