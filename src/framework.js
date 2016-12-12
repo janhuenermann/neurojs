@@ -15,7 +15,8 @@ var neurojs = {
 	Buffers: require('./rl/replay-buffers.js'),
 	NetOnDisk: require('./storage.js'),
 	FileLoader: require('./util/downloader.js'),
-	Binary: require('./util/file.js')
+	Binary: require('./util/file.js'),
+	Shared: require('./shared.js')
 
 }
 

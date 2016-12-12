@@ -15,7 +15,7 @@ function agent(opt, world) {
     this.timerFrequency = 60 / this.frequency
 
     if (this.options.dynamicallyLoaded !== true) {
-    	this.init(this.world.brains.actor, this.world.brains.shared.critic)
+    	this.init(null, null)
     }
 
     this.car.onContact = (speed) => {
@@ -43,19 +43,20 @@ agent.prototype.init = function (actor, critic) {
 
         temporalWindow: temporal, 
 
-        discount: 0.98, 
+        discount: 0.95, 
 
         experience: 75e3, 
         learningPerTick: 40, 
-        startLearningAt: 5000,
+        startLearningAt: 900,
 
-        theta: 1, // progressive copy
+        theta: 0.05, // progressive copy
 
-        alpha: 0 // advantage learning
+        alpha: 0.1 // advantage learning
 
     })
 
-    this.brain.algorithm.critic.optimizedCentrally = true
+    this.world.brains.shared.add('actor', this.brain.algorithm.actor)
+    this.world.brains.shared.add('critic', this.brain.algorithm.critic)
 
     this.actions = actions
     this.car.addToWorld()

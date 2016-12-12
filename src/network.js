@@ -235,8 +235,8 @@ class Configuration {
 		this.freezed = val
 	}
 
-	optimize(accu) {
-		if (accu !== false) this.accumulate(Number.isInteger(accu) ? accu : undefined)
+	optimize(accu = true) {
+		if (accu) this.accumulate(Number.isInteger(accu) ? accu : undefined)
 		this.forEachParameter(param => this.optimizer.apply(param))
 	}
 	

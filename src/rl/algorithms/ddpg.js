@@ -143,15 +143,9 @@ class DDPG extends Algorithm {
 
 	learn() {
 		// Improve through batch accumuluated gradients
-		if (!this.actor.optimizedCentrally) {
-			this.actor.config.optimize(false)
-		}	
-
-		if (!this.critic.optimizedCentrally) {
-			this.critic.config.optimize(false)
-		}
+		this.actor.optimize()
+		this.critic.optimize()
 		
-
 		// Copy actor and critic to target networks slowly
 		this.targetNetworkUpdates()
 	}

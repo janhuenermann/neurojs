@@ -146,6 +146,14 @@
 	window.downloadBrain = downloadBrain;
 	window.saveEnv = saveEnv
 	window.readWorld = readWorld
+	window.updateIfLearning = function (value) {
+	    for (var i = 0; i <  window.gcd.world.agents.length; i++) {
+	        window.gcd.world.agents[i].brain.learning = value
+	    }
+
+	    window.gcd.world.plotRewardOnly = !value
+	};
+
 	window.readBrain = readBrain;
 
 	setInterval(stats, 100);
@@ -184,7 +192,7 @@
 	    this.timerFrequency = 60 / this.frequency
 
 	    if (this.options.dynamicallyLoaded !== true) {
-	    	this.init(this.world.brains.actor, this.world.brains.shared.critic)
+	    	this.init(null, null)
 	    }
 
 	    this.car.onContact = (speed) => {
@@ -212,19 +220,20 @@
 
 	        temporalWindow: temporal, 
 
-	        discount: 0.98, 
+	        discount: 0.95, 
 
 	        experience: 75e3, 
 	        learningPerTick: 40, 
-	        startLearningAt: 5000,
+	        startLearningAt: 900,
 
-	        theta: 1, // progressive copy
+	        theta: 0.05, // progressive copy
 
-	        alpha: 0 // advantage learning
+	        alpha: 0.1 // advantage learning
 
 	    })
 
-	    this.brain.algorithm.critic.optimizedCentrally = true
+	    this.world.brains.shared.add('actor', this.brain.algorithm.actor)
+	    this.world.brains.shared.add('critic', this.brain.algorithm.critic)
 
 	    this.actions = actions
 	    this.car.addToWorld()
@@ -2171,7 +2180,7 @@
 
 	    this.pixi.view.style.width = "100%";
 	    this.pixi.view.style.height = "100%";
-	    this.pixi.view.style.outline = "5px solid #EEE";
+	    this.pixi.view.style.border = "5px solid #EEE";
 	    this.elementContainer.appendChild(this.pixi.view);
 
 	    this.bodies = [];
@@ -2431,6 +2440,8 @@
 	    this.chartFrequency = 60
 	    this.chartDataPoints = 200
 
+	    this.plotRewardOnly = false
+
 	    this.obstacles = []
 
 	    var input = 118, actions = 2
@@ -2460,9 +2471,10 @@
 
 	    }
 
-	    this.brains.shared = {
-	        critic: this.brains.critic.newConfiguration()
-	    }
+	    this.brains.shared = new window.neurojs.Shared.ConfigPool()
+
+	    this.brains.shared.set('actor', this.brains.actor.newConfiguration())
+	    this.brains.shared.set('critic', this.brains.critic.newConfiguration())
 	};
 
 	world.prototype.addBodyFromCompressedPoints = function (outline) {
@@ -2585,11 +2597,9 @@
 	        reward += this.agents[i].reward
 	    }
 
-	    if (agentUpdate && this.agents[0].brain.training && this.agents[0].brain.algorithm.critic.optimizedCentrally) {
-	        this.agents[0].brain.algorithm.critic.config.optimize(false)
-	    }
+	    this.brains.shared.step()
 
-	    if (!this.plotting && this.agents[0].brain.training && 1 === this.timer % this.chartFrequency) {
+	    if (!this.plotting && (this.agents[0].brain.training || this.plotRewardOnly) && 1 === this.timer % this.chartFrequency) {
 	        this.plotting = true
 	    }
 
@@ -2636,10 +2646,19 @@
 	            this.chartData[key] = this.chartData[key].slice(-this.chartDataPoints)
 	        }
 
-	        series.push({
-	            name: key,
-	            data: this.chartData[key]
-	        })
+	        if (this.plotRewardOnly && key !== 'reward') {
+	            series.push({
+	                name: key,
+	                data: []
+	            })
+	        } 
+
+	        else {
+	            series.push({
+	                name: key,
+	                data: this.chartData[key]
+	            })
+	        }
 	    }
 
 	    this.chart.update({

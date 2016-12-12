@@ -54,7 +54,7 @@ function renderer(world, container) {
 
     this.pixi.view.style.width = "100%";
     this.pixi.view.style.height = "100%";
-    this.pixi.view.style.outline = "5px solid #EEE";
+    this.pixi.view.style.border = "5px solid #EEE";
     this.elementContainer.appendChild(this.pixi.view);
 
     this.bodies = [];

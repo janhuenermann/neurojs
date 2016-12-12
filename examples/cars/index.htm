@@ -8,10 +8,20 @@
 		    padding:0;
 		    width:100%;
 		    height:100%;
+		   font-family: sans-serif;
+		}
+
+		* {
+			-webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
 		}
 
 		.description {
 			padding: 0 20px;
+		}
+
+		.wrap {
+			width: 100%; max-width: 1000px; margin: 40px auto;
 		}
 
 		.app-chart .ct-line {
@@ -48,26 +58,86 @@
 			color: #999;
 			font-weight: 300;
 		}
+
+		button, input {
+			display: inline-block;
+		}
+
+		button {
+			--webkit-appearance: none;
+			outline: none;
+			border: 2px solid #eee;
+			background: #eee;
+			border-radius: 5px;
+			padding: 4px 10px;
+			color: #000;
+			text-transform: uppercase;
+			cursor: pointer;
+		}
+
+		button:hover {
+			background: #fff;
+		}
+
+		.row {
+			margin-top: 10px;
+		}
+
+		label {
+			display: block;
+			margin-top: 10px;
+			font-size: 14px;
+			font-style: italic;
+		}
+
+		.credits {
+			text-align: center;
+			color: #ccc;
+			font-size: 15px;
+			margin: 30px 0 60px;
+		}
 	</style>
 	<link rel="stylesheet" type="text/css" href="vendor/chartist.min.css">
 	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
 </head>
 <body>
-	<div class="description">
+	<div class="description wrap">
 		<p>This demo is about self-learning cars. The reinforcement-learning-goal of these cars is to maximize their future speed at all times, which means to avoid shapes. The input to the cars' neural network is the sensor data: speed in x- and y-direction, distance + entity type + normal vector (2d) of sensing rays (19 per car). In addition to the current time-step they receive the last action-state pair. Each state has 19x4 + 2 = 78 dimensions. The action space is 2 dimensional, which means the input to the car's brain is 78x2 + 2 = 158 dimensional. </p>
 		<p>This page uses the DDPG (deep deterministic policy gradient) algorithm, which means the action space is continuous. 1d for speed control (gas pedal, -1 for braking/going backwards, +1 for max thrust in forward direction) and 1d for stearing (-1 left, 0 straight, +1 right). </p>
 		<p><strong>Click and drag to draw shapes, which must be avoided by the cars.</strong></p>
-		<button onclick="window.gcd.goSlow();">Go slow</button>
-		<button onclick="window.gcd.goFast();">Go fast</button><br>
-		<button onclick="window.downloadBrain(0);">Save agent</button><br>
-		<button onclick="window.saveEnv();">Save world</button><br>
-		<input type='file' accept='*/*' onchange='readBrain(event)'><br>
-		<input type='file' accept='*/*' onchange='readWorld(event)'><br>
-		<p>Agent's lifespan: <span id="agent-age">0</span>s</p>
+
+		<div class="row">
+			<button onclick="window.gcd.goSlow();">Go slow</button>
+			<button onclick="window.gcd.goFast();">Go fast</button>
+		</div>
+		<div class="row">
+			<button onclick="window.downloadBrain(0);">Save agent</button>
+			<button onclick="window.saveEnv();">Save world</button>
+		</div>
+		
+		<div class="row">
+			<button onclick="window.gcd.world.clearObstacles();">Clear world</button>
+		</div>
+		
+		<div class="row">
+			<button onclick="document.getElementById('brainFile').click();">Open brain file</button>
+			<button onclick="document.getElementById('worldFile').click();">Open world file</button>
+		</div>
+
+		<input id="brainFile" type='file' accept='*/*' onchange='readBrain(event)' style="display: none">
+		<input id="worldFile" type='file' accept='*/*' onchange='readWorld(event)' style="display: none">
+
+		<div style="margin-top: 20px"><input type="checkbox" onclick="window.updateIfLearning(this.checked);" checked>Learning</div>
 	</div>
 
-	<div id="container" style="width: 100%; max-width: 1200px; margin: 0 auto;"></div>
-	<div style="width: 100%; max-width: 1200px; margin: 40px auto;" class="ct-chart ct-double-octave app-chart"></div>
+	<div id="container" class="wrap"></div>
+
+	<div class="wrap">
+		<p>Agent's lifespan: <span id="agent-age">0</span>s</p>
+		<div class="ct-chart ct-double-octave app-chart"></div>
+	</div>
+
+	<p class="credits">Made by Jan H&uuml;nermann</p>
 
 	<script type="text/javascript" src="vendor/chartist.min.js"></script>
 	<script type="text/javascript" src="vendor/p2.min.js"></script> <!-- physics lib -->

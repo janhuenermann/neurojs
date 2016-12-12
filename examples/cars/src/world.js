@@ -20,6 +20,8 @@ function world() {
     this.chartFrequency = 60
     this.chartDataPoints = 200
 
+    this.plotRewardOnly = false
+
     this.obstacles = []
 
     var input = 118, actions = 2
@@ -49,9 +51,10 @@ function world() {
 
     }
 
-    this.brains.shared = {
-        critic: this.brains.critic.newConfiguration()
-    }
+    this.brains.shared = new window.neurojs.Shared.ConfigPool()
+
+    this.brains.shared.set('actor', this.brains.actor.newConfiguration())
+    this.brains.shared.set('critic', this.brains.critic.newConfiguration())
 };
 
 world.prototype.addBodyFromCompressedPoints = function (outline) {
@@ -174,11 +177,9 @@ world.prototype.step = function (dt) {
         reward += this.agents[i].reward
     }
 
-    if (agentUpdate && this.agents[0].brain.training && this.agents[0].brain.algorithm.critic.optimizedCentrally) {
-        this.agents[0].brain.algorithm.critic.config.optimize(false)
-    }
+    this.brains.shared.step()
 
-    if (!this.plotting && this.agents[0].brain.training && 1 === this.timer % this.chartFrequency) {
+    if (!this.plotting && (this.agents[0].brain.training || this.plotRewardOnly) && 1 === this.timer % this.chartFrequency) {
         this.plotting = true
     }
 
@@ -225,10 +226,19 @@ world.prototype.updateChart = function () {
             this.chartData[key] = this.chartData[key].slice(-this.chartDataPoints)
         }
 
-        series.push({
-            name: key,
-            data: this.chartData[key]
-        })
+        if (this.plotRewardOnly && key !== 'reward') {
+            series.push({
+                name: key,
+                data: []
+            })
+        } 
+
+        else {
+            series.push({
+                name: key,
+                data: this.chartData[key]
+            })
+        }
     }
 
     this.chart.update({

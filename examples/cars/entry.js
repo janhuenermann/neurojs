@@ -100,6 +100,14 @@ window.gcd = boot();
 window.downloadBrain = downloadBrain;
 window.saveEnv = saveEnv
 window.readWorld = readWorld
+window.updateIfLearning = function (value) {
+    for (var i = 0; i <  window.gcd.world.agents.length; i++) {
+        window.gcd.world.agents[i].brain.learning = value
+    }
+
+    window.gcd.world.plotRewardOnly = !value
+};
+
 window.readBrain = readBrain;
 
 setInterval(stats, 100);

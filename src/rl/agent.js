@@ -26,7 +26,7 @@ class Agent {
 
 			algorithm: 'ddpg',
 
-			discount: opt.discount || 0.95,
+			discount: opt.discount || 0.9,
 			beta: 0.15, // how to prioritise experiences (0 = no prioritisation, 1 = full prioritisation)
 
 		}, opt)

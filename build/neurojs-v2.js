@@ -61,7 +61,8 @@
 		Buffers: __webpack_require__(32),
 		NetOnDisk: __webpack_require__(36),
 		FileLoader: __webpack_require__(40),
-		Binary: __webpack_require__(37)
+		Binary: __webpack_require__(37),
+		Shared: __webpack_require__(15)
 
 	}
 
@@ -693,8 +694,8 @@
 			this.freezed = val
 		}
 
-		optimize(accu) {
-			if (accu !== false) this.accumulate(Number.isInteger(accu) ? accu : undefined)
+		optimize(accu = true) {
+			if (accu) this.accumulate(Number.isInteger(accu) ? accu : undefined)
 			this.forEachParameter(param => this.optimizer.apply(param))
 		}
 		
@@ -1957,29 +1958,84 @@
 
 	}
 
-	class NetworkPool extends EventRadio {
+	class ConfigPool extends EventRadio {
 
 		constructor(names) {
+			super()
 			this.states = {}
+			this.configs = {}
+			this.requested = []
 		}
 
 		add(name, wrapper) {
-			this.states[name] = wrapper
+			if (!(name in this.states)) {
+				this.states[name] = []
+			}
+
+			if (name in this.configs) {
+				wrapper.set(this.configs[name])
+			}
+
+			this.states[name].push(wrapper)
 			wrapper.pool = this
+			wrapper.__pool_name = name
+
+			this.trigger('add', [ wrapper, name ])
+			this.trigger('add ' + name, [ wrapper ])
 		}
 
-		set(name, value) {
+		set(name, config) {
+			if (name in this.states) {
+
+				for (var i = 0; i < this.states[name].length; i++) {
+					this.states[name][i].set(config)
+				}
+
+			}
+
+			this.configs[name] = config
 		}
 
-		dispatchOptimization() {
+		step() {
+			for (var i = 0; i < this.requested.length; i++) {
+				var name = this.requested[i]
+				this.configs[name].optimize(false)
+			}
+
+			this.requested = []
+		}
+
+		requestOptimisation(wrapper) {
+			if (wrapper.__pool_name === undefined || !(wrapper.__pool_name in this.configs)) 
+				return false
+
+			if (this.requested.indexOf(wrapper.__pool_name) >= 0)
+				return true
+
+			this.requested.push(wrapper.__pool_name)
+
+			return true
 		}
 
 	}
 
 	class NetworkWrapper extends EventRadio {
 
+		constructor() {
+			super()
+
+			this.on('set', () => {
+				if (this.optim !== undefined)
+					this.config.useOptimizer(this.optim)
+			})
+		}
+
 		set(value) {
 			var state
+
+			if (!value) {
+				return
+			}
 
 			if (value.constructor.name === 'State') {
 				state = value
@@ -1999,19 +2055,23 @@
 		useOptimizer(optim) {
 			this.optim = optim
 
-			this.on('set', () => {
-				if (this.optim !== undefined)
-					this.config.useOptimizer(this.optim)
-			})
-
-			if (this.config)
+			if (this.config) {
 				this.config.useOptimizer(optim)
+			}
+		}
+
+		optimize() {
+			if (this.pool && this.pool.requestOptimisation(this)) {
+				return 
+			}
+			
+			this.config.optimize(false)
 		}
 
 	}
 
 	module.exports = {
-		NetworkWrapper, NetworkPool
+		NetworkWrapper, ConfigPool
 	}
 
 /***/ },
@@ -3639,15 +3699,9 @@
 
 		learn() {
 			// Improve through batch accumuluated gradients
-			if (!this.actor.optimizedCentrally) {
-				this.actor.config.optimize(false)
-			}	
-
-			if (!this.critic.optimizedCentrally) {
-				this.critic.config.optimize(false)
-			}
+			this.actor.optimize()
+			this.critic.optimize()
 			
-
 			// Copy actor and critic to target networks slowly
 			this.targetNetworkUpdates()
 		}
