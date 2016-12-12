@@ -2439,6 +2439,7 @@
 	    this.chartEphemeralData = []
 	    this.chartFrequency = 60
 	    this.chartDataPoints = 200
+	    this.smoothReward = 0
 
 	    this.plotRewardOnly = false
 
@@ -2630,8 +2631,14 @@
 	    for (var i = 0; i < this.chartFrequency; i++) {
 	        var subpoint = this.chartEphemeralData[i]
 	        for (var key in point) {
-	            point[key] += subpoint[key]
+	            point[key] += subpoint[key] / this.chartFrequency
 	        }
+	    }
+
+	    if (point.reward) {
+	        var f = 1e-2;
+	        this.smoothReward = this.smoothReward * (1.0 - f) + f * point.reward;
+	        point.smoothReward = this.smoothReward;
 	    }
 
 	    var series = []
@@ -2640,13 +2647,13 @@
 	            this.chartData[key] = []
 	        }
 
-	        this.chartData[key].push(point[key] / this.chartFrequency)
+	        this.chartData[key].push(point[key])
 
 	        if (this.chartData[key].length > this.chartDataPoints) {
 	            this.chartData[key] = this.chartData[key].slice(-this.chartDataPoints)
 	        }
 
-	        if (this.plotRewardOnly && key !== 'reward') {
+	        if (this.plotRewardOnly && (key !== 'reward' && key !== 'smoothReward')) {
 	            series.push({
 	                name: key,
 	                data: []
@@ -2654,7 +2661,7 @@
 	        } 
 
 	        else {
-	            series.push({
+	           series.push({
 	                name: key,
 	                data: this.chartData[key]
 	            })
