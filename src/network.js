@@ -1,16 +1,18 @@
 "use strict";
 
-var dot = require('./layers/dot.js');
-var dropout = require('./layers/dropout.js');
-var nonlinear = require('./layers/nonlinear.js');
-var input = require('./layers/input.js');
-var regression = require('./layers/regression.js');
-var noise = require('./layers/noise.js');
+var dot = require('./layers/dot.js')
+var dropout = require('./layers/dropout.js')
+var nonlinear = require('./layers/nonlinear.js')
+var input = require('./layers/input.js')
+var regression = require('./layers/regression.js')
+var noise = require('./layers/noise.js')
 var bayesian = require('./layers/bayesian.js')
 
-var Size = require('./math/size.js');
-var Tensor = require('./math/tensor.js');
-var Optim = require('./optim.js');
+var Size = require('./math/size.js')
+var Tensor = require('./math/tensor.js')
+var Optim = require('./optim.js')
+
+var SharedConfiguration = require('./shared.js')
 
 if (typeof window === 'undefined') {
 	require('colors');
@@ -20,6 +22,7 @@ if (typeof window === 'undefined') {
 class Model {
 
 	constructor(opt) {
+		this.representation = opt
 		this.build(opt)
 	}
 
@@ -169,7 +172,6 @@ class Model {
 	static create(inp, opt) {
 		switch (opt.type) {
 			case 'fc': return new dot.FullyConnectedLayer(inp, opt)
-			case 'fc-sa': return new dot.FullyConnectedLayerSelfAware(inp, opt)
 			case 'dropout': return new dropout.DropOutLayer(inp, opt)
 			case 'sigmoid': return new nonlinear.SigmoidLayer(inp, opt)
 			case 'tanh': return new nonlinear.TanhLayer(inp, opt)
@@ -190,7 +192,7 @@ class Model {
 // defines how the network behaves; parameter/weights etc.
 class Configuration {
 
-	constructor(model, parameters) {
+	constructor(model, parameters, optimizer) {
 		this.model = model
 		this.parameters = []
 		this.optimizer = null
@@ -203,7 +205,7 @@ class Configuration {
 			}
 
 			var param = this.parameters[i] = new Tensor(layer.dimensions.parameters)
-			if (parameters && parameters.length === this.model.layers.length) // copy from
+			if (parameters && i in parameters) // copy from
 				param.w.set(parameters[i].w)
 			else if (layer.initialize) // initialize as new parameters
 				layer.initialize(param)
@@ -213,6 +215,9 @@ class Configuration {
 			this.countOfParameters += layer.dimensions.parameters
 		}
 
+		if (optimizer) {
+			this.useOptimizer(optimizer)
+		}
 	}
 
 
@@ -266,12 +271,12 @@ class Configuration {
 		return new State(this)
 	}
 
-	duplicate() {
-		return new Configuration(this.model, this.optimizer, this.parameters)
+	clone() {
+		return new Configuration(this.model, this.parameters, this.optimizer)
 	}
 
 
-	read(arr) {
+	putWeights(arr) {
 		var joined = arr
 
 		if (arr.length !== this.countOfParameters)
@@ -288,7 +293,7 @@ class Configuration {
 		}
 	}
 
-	write() {
+	pullWeights() {
 		var joined = new Float64Array(this.countOfParameters)
 
 		for (var i = 0, p = 0; i < this.parameters.length; i++) { 
@@ -302,6 +307,11 @@ class Configuration {
 		}
 
 		return joined
+	}
+
+
+	share() {
+		return new SharedConfiguration(this)
 	}
 
 }

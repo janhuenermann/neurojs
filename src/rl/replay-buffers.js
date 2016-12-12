@@ -74,9 +74,16 @@ class PrioritizedReplayBuffer extends ReplayBuffer {
 	}
 
 	add(e) {
-		this.leafs[this.iterations % this.leafs.length].set(e)
-		this.size = Math.max(this.size, this.iterations % this.leafs.length + 1)
+		if (this.size === this.leafs.length) {
+			this.root.descent((a, b) => a.minimum < b.minimum ? 0 : 1).set(e)
+		}
+
+		else {
+			this.leafs[this.size].set(e)
+		}
+		
 		this.iterations += 1
+		this.size = Math.max(this.size, this.iterations % this.leafs.length)
 	}
 
 	sample(n) { 
@@ -165,7 +172,7 @@ PrioritizedReplayBuffer.Node = class Node {
 		if (!this.experience)
 			return 
 
-		this.value = this.experience.priority || 0.0
+		this.value = this.experience.priority || Infinity
 
 		this.maximum = this.value
 		this.minimum = this.value

@@ -1,18 +1,32 @@
 var app = require('./src/index.js');
+var car = require('./src/car.js');
+
+function createLossChart() {
+    var data = {
+        series: [[], []]
+    };
+
+    return new Chartist.Line('.ct-chart', data, {
+        lineSmooth: Chartist.Interpolation.none()
+    });
+}
 
 function boot() {
     this.world = new app.world();
     this.renderer = new app.renderer(this.world, document.getElementById("container"));
 
-    this.world.init(4, this.renderer);
+    this.world.init(this.renderer)
+    this.world.populate(4)
 
     this.dispatcher = new app.dispatcher(this.renderer, this.world);
     this.dispatcher.begin();
 
+    this.world.chart = createLossChart();
+
     return this.dispatcher;
 };
 
-function saveAs(dv) {
+function saveAs(dv, name) {
     var a;
     if (typeof window.downloadAnchor == 'undefined') {
         a = window.downloadAnchor = document.createElement("a");
@@ -26,7 +40,7 @@ function saveAs(dv) {
         tmpURL = window.URL.createObjectURL(blob);
 
     a.href = tmpURL;
-    a.download = 'brain.bin';
+    a.download = name;
     a.click();
 
     window.URL.revokeObjectURL(tmpURL);
@@ -34,8 +48,12 @@ function saveAs(dv) {
 }
 
 function downloadBrain(n) {
-	var weights = window.gcd.world.agents[n].car.brain.export()
-	saveAs(new DataView(weights.buffer))
+	var buf = window.gcd.world.agents[n].brain.export()
+	saveAs(new DataView(buf), 'brain.bin')
+}
+
+function saveEnv() {
+    saveAs(new DataView(window.gcd.world.export()), 'world.bin')
 }
 
 function readBrain(e) {
@@ -43,12 +61,27 @@ function readBrain(e) {
 
     var reader = new FileReader();
     reader.onload = function(){
-        var buffer = reader.result;
-        var params = new Float64Array(buffer);
+        var buffer = reader.result
+        var imported = window.neurojs.NetOnDisk.readMultiPart(buffer)
+
         for (var i = 0; i <  window.gcd.world.agents.length; i++) {
-            window.gcd.world.agents[i].car.brain.import(params);
-            // window.gcd.world.agents[i].car.brain.learning = false;
+            window.gcd.world.agents[i].brain.algorithm.actor.set(imported.actor.clone())
+            window.gcd.world.agents[i].brain.algorithm.critic.set(imported.critic)
+            // window.gcd.world.agents[i].car.brain.learning = false
         }
+    };
+
+    reader.readAsArrayBuffer(input.files[0]);
+}
+
+
+function readWorld(e) {
+    var input = event.target;
+
+    var reader = new FileReader();
+    reader.onload = function(){
+        var buffer = reader.result
+        window.gcd.world.import(buffer)
     };
 
     reader.readAsArrayBuffer(input.files[0]);
@@ -65,6 +98,8 @@ function stats() {
 
 window.gcd = boot();
 window.downloadBrain = downloadBrain;
+window.saveEnv = saveEnv
+window.readWorld = readWorld
 window.readBrain = readBrain;
 
 setInterval(stats, 100);

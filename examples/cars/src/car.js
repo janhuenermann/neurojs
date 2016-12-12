@@ -34,19 +34,20 @@ function car(world, opt) {
         ]
     };
 
-    this.maxSteer = Math.PI / 7;
-    this.maxEngineForce = 10;
-    this.maxBrakeForce = 5;
-    this.maxBackwardForce = 2;
-    this.linearDamping = 0.5;
+    this.maxSteer = Math.PI / 7
+    this.maxEngineForce = 10
+    this.maxBrakeForce = 5
+    this.maxBackwardForce = 2
+    this.linearDamping = 0.5
 
     this.continuous = true
-    this.frequency = 15
-    this.discount = .75
+
+    this.contact = 0
+    this.impact = 0
 
     this.world = world
 
-    this.init();
+    this.init()
 };
 
 car.TYPE = 2
@@ -54,135 +55,17 @@ car.TYPE = 2
 car.prototype.init = function () {
     this.createPhysicalBody()
 
-    this.dynamicForwardSensor = false
-
     this.sensors = sensors.build(this, this.options.sensors)
     this.speed = this.sensors[this.sensors.length - 1]
-    
 
-    this.createBrain()
-
-    this.punishment = 0
-    this.timer = 0.0
-    
-};
-
-car.prototype.createBrain = function () {
-
-    var states = 0
+    this.states = 0 // sensor dimensonality
 
     for (var i = 0; i < this.sensors.length; i++) {
-        states += this.sensors[i].dimensions
+        this.states += this.sensors[i].dimensions
     }
-
-    if (this.continuous) {
-
-        var actions = 2 + (this.dynamicForwardSensor ? 1 : 0)
-        var temporal = 1
-
-        var input = window.neurojs.Agent.getInputDimension(states, actions, temporal)
-
-        if(!car.actor) {
-            car.actor = new window.neurojs.Network.Model([
-
-                { type: 'input', size: input },
-                { type: 'fc', size: 40, activation: 'relu' },
-                { type: 'fc', size: 40, activation: 'relu' },
-                { type: 'fc', size: 40, activation: 'relu', dropout: 0.5 },
-                { type: 'fc', size: actions, activation: 'tanh' },
-                { type: 'regression' }
-
-            ])
-        }
-
-        if(!car.critic) {
-            car.critic = new window.neurojs.Network.Model([
-
-                { type: 'input', size: input + actions },
-                { type: 'fc', size: 50, activation: 'relu' },
-                { type: 'fc', size: 50, activation: 'relu' },
-                { type: 'fc', size: 50, activation: 'relu' },
-                { type: 'fc', size: 1 },
-                { type: 'regression' }
-
-            ]).newConfiguration()
-            this.world.pool.critic = car.critic
-        }
-
-        if(!car.target) {
-            car.target = car.critic.model.newConfiguration()
-            this.world.pool.target = car.target
-        }
-
-        var exp_size = 5000 * this.frequency
-
-        this.brain = new window.neurojs.Agent({
-
-            actor: car.actor.newConfiguration(),
-            critic: car.critic,
-
-            targetCritic: car.target,
-
-            states: states,
-            actions: actions,
-
-            algorithm: 'ddpg',
-
-            temporalWindow: temporal, 
-
-            discount: 0.98, // Math.pow(this.discount, 1.0 / this.frequency),
-
-            experience: exp_size, 
-            learningPerTick: 50, 
-            startLearningAt: 5000,
-
-            theta: 0.001,
-
-            alpha: 0.1
-
-        })
-
-        // this.world.pool.add(this.brain)
-        // window.neurojs.Loader.loadAgent('checkpoint/car-ddpg-1-age75000.bin', this.brain)
-
-    }
-
-    else {
-
-        var actions = car.actions.length
-        var temporal = 1
-
-        var input = window.neurojs.Agent.getInputDimension(states, actions, temporal)
-
-        var net = new window.neurojs.Network.Model([
-
-            { type: 'input', size: input },
-            { type: 'fc', size: 80, activation: 'relu' },
-            { type: 'fc', size: 60, activation: 'relu' },
-            { type: 'fc', size: actions },
-            { type: 'regression' }
-
-        ])
-
-        this.brain = new window.neurojs.Agent({
-
-            network: net.newConfiguration(),
-
-            states: states,
-            actions: actions,
-
-            algorithm: 'dqn',
-
-            temporalWindow: temporal, 
-
-            discount: Math.pow(this.discount, 1.0 / this.frequency)
-
-        })
-
-    }
-
-    this.states = states
-
+    
+    this.punishment = 0
+    this.timer = 0.0
 };
 
 car.prototype.createPhysicalBody = function () {
@@ -265,10 +148,6 @@ car.prototype.createPhysicalBody = function () {
     this.backWheel.setSideFriction(45) // Less side friction on back wheel makes it easier to drift
 };
 
-car.prototype.update = function (dt) {
-    this.updateBrain(dt)
-};
-
 car.prototype.updateSensors = function () {
     var data = new Float64Array(this.states)
     for (var i = 0, k = 0; i < this.sensors.length; k += this.sensors[i].dimensions, i++) {
@@ -285,44 +164,6 @@ car.prototype.updateSensors = function () {
     return data
 };
 
-car.actions = [ [ 0, -1 ], [ 0, +1 ], [ 1, -1 ], [ 1, +1 ], [ -1, -1 ], [ -1, +1 ], [ 1, 0 ], [ -1, 0 ], [ 0, 0 ] ]
-car.prototype.updateBrain = function (dt) {
-    this.timer += dt
-
-    if (this.timer >= 1.0 / this.frequency) {
-        var d = this.updateSensors()
-
-        var r = Math.pow(this.chassisBody.velocity[1], 2)
-             - 0.3 * Math.pow(this.chassisBody.velocity[0], 2)
-             - this.punishment;
-
-        if (Math.abs(this.speed.velocity) < 1e-2) { // punish no movement; it harms exploration
-            r -= 1.0 
-        }
-
-        this.brain.learn(r)
-
-        if (this.continuous) {
-            this.action = this.brain.policy(d)
-        }
-
-        else {
-            var action_idx = this.brain.policy(d)
-            this.action = car.actions[action_idx]
-        }
-
-        if (this.dynamicForwardSensor) {
-            this.sensors[0].updateLength((0.5 + 0.5 * this.action[2]) * 25)
-            this.sensors[0].highlighted = true
-        }
-        
-        this.timer = 0.0
-        this.punishment = 0.0
-    }
-    
-    if (this.action)
-        this.handle(this.action[0], this.action[1])
-};
 
 car.prototype.drawSensors = function () {
     if (this.overlay.visible !== true) {
@@ -337,13 +178,37 @@ car.prototype.drawSensors = function () {
 };
 
 car.prototype.addToWorld = function () {
-    this.world.p2.addBody(this.chassisBody);
-    this.vehicle.addToWorld(this.world.p2);
+    this.chassisBody.position[0] = (Math.random() - .5) * this.world.size.w
+    this.chassisBody.position[1] = (Math.random() - .5) * this.world.size.h
+    this.chassisBody.angle = (Math.random() * 2.0 - 1.0) * Math.PI
 
-   this.world.p2.on("beginContact",(function(event){
-    if (event.bodyA === this.chassisBody || event.bodyB === this.chassisBody)
-        this.punishment = Math.max(5 * Math.pow(this.chassisBody.velocity[1], 2), 50.0); 
-   }).bind(this));
+    this.world.p2.addBody(this.chassisBody)
+    this.vehicle.addToWorld(this.world.p2)
+
+   this.world.p2.on("beginContact", (event) => {
+
+        if ((event.bodyA === this.chassisBody || event.bodyB === this.chassisBody)) {
+            // this.onContact( Math.pow(this.chassisBody.velocity[1], 2) + Math.pow(this.chassisBody.velocity[0], 2) );
+            this.contact++;
+        }
+
+   });
+
+   this.world.p2.on("endContact", (event) => {
+
+        if ((event.bodyA === this.chassisBody || event.bodyB === this.chassisBody)) {
+            this.contact--;
+        }
+
+   })
+
+   this.world.p2.on("impact", (event) => {
+
+        if ((event.bodyA === this.chassisBody || event.bodyB === this.chassisBody)) {
+            this.impact = Math.sqrt(Math.pow(this.chassisBody.velocity[0], 2) + Math.pow(this.chassisBody.velocity[1], 2))
+        }
+
+   })
 };
 
 car.prototype.handleKeyInput = function (k) {
@@ -399,5 +264,6 @@ car.prototype.handle = function (throttle, handlebar) {
     this.wheels.topLeft.rotation = this.frontWheel.steerValue * 0.7071067812
     this.wheels.topRight.rotation = this.frontWheel.steerValue * 0.7071067812
 };
+
 
 module.exports = car;

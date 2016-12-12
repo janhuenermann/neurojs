@@ -45,20 +45,34 @@
 /***/ function(module, exports, __webpack_require__) {
 
 	var app = __webpack_require__(1);
+	var car = __webpack_require__(3);
+
+	function createLossChart() {
+	    var data = {
+	        series: [[], []]
+	    };
+
+	    return new Chartist.Line('.ct-chart', data, {
+	        lineSmooth: Chartist.Interpolation.none()
+	    });
+	}
 
 	function boot() {
 	    this.world = new app.world();
 	    this.renderer = new app.renderer(this.world, document.getElementById("container"));
 
-	    this.world.init(4, this.renderer);
+	    this.world.init(this.renderer)
+	    this.world.populate(4)
 
 	    this.dispatcher = new app.dispatcher(this.renderer, this.world);
 	    this.dispatcher.begin();
 
+	    this.world.chart = createLossChart();
+
 	    return this.dispatcher;
 	};
 
-	function saveAs(dv) {
+	function saveAs(dv, name) {
 	    var a;
 	    if (typeof window.downloadAnchor == 'undefined') {
 	        a = window.downloadAnchor = document.createElement("a");
@@ -72,7 +86,7 @@
 	        tmpURL = window.URL.createObjectURL(blob);
 
 	    a.href = tmpURL;
-	    a.download = 'brain.bin';
+	    a.download = name;
 	    a.click();
 
 	    window.URL.revokeObjectURL(tmpURL);
@@ -80,8 +94,12 @@
 	}
 
 	function downloadBrain(n) {
-		var weights = window.gcd.world.agents[n].car.brain.export()
-		saveAs(new DataView(weights.buffer))
+		var buf = window.gcd.world.agents[n].brain.export()
+		saveAs(new DataView(buf), 'brain.bin')
+	}
+
+	function saveEnv() {
+	    saveAs(new DataView(window.gcd.world.export()), 'world.bin')
 	}
 
 	function readBrain(e) {
@@ -89,12 +107,27 @@
 
 	    var reader = new FileReader();
 	    reader.onload = function(){
-	        var buffer = reader.result;
-	        var params = new Float64Array(buffer);
+	        var buffer = reader.result
+	        var imported = window.neurojs.NetOnDisk.readMultiPart(buffer)
+
 	        for (var i = 0; i <  window.gcd.world.agents.length; i++) {
-	            window.gcd.world.agents[i].car.brain.import(params);
-	            // window.gcd.world.agents[i].car.brain.learning = false;
+	            window.gcd.world.agents[i].brain.algorithm.actor.set(imported.actor.clone())
+	            window.gcd.world.agents[i].brain.algorithm.critic.set(imported.critic)
+	            // window.gcd.world.agents[i].car.brain.learning = false
 	        }
+	    };
+
+	    reader.readAsArrayBuffer(input.files[0]);
+	}
+
+
+	function readWorld(e) {
+	    var input = event.target;
+
+	    var reader = new FileReader();
+	    reader.onload = function(){
+	        var buffer = reader.result
+	        window.gcd.world.import(buffer)
 	    };
 
 	    reader.readAsArrayBuffer(input.files[0]);
@@ -111,6 +144,8 @@
 
 	window.gcd = boot();
 	window.downloadBrain = downloadBrain;
+	window.saveEnv = saveEnv
+	window.readWorld = readWorld
 	window.readBrain = readBrain;
 
 	setInterval(stats, 100);
@@ -134,16 +169,98 @@
 
 	var car = __webpack_require__(3);
 
-	function agent(world) {
-	    this.car = new car(world, {});
-	    this.init();
+	function agent(opt, world) {
+	    this.car = new car(world, {})
+	    this.options = opt
+
+	    this.world = world
+	    this.frequency = 15
+	    this.reward = 0
+	    this.rewardBonus = 0
+	    this.loaded = false
+
+	    this.loss = 0
+	    this.timer = 0
+	    this.timerFrequency = 60 / this.frequency
+
+	    if (this.options.dynamicallyLoaded !== true) {
+	    	this.init(this.world.brains.actor, this.world.brains.shared.critic)
+	    }
+
+	    this.car.onContact = (speed) => {
+	    	this.rewardBonus -= Math.max(speed, 50.0)
+	    };
+	    
 	};
 
-	agent.prototype.init = function () {
+	agent.prototype.init = function (actor, critic) {
+	    var actions = 2
+	    var temporal = 1
+	    var states = this.car.states
+
+	    var input = window.neurojs.Agent.getInputDimension(states, actions, temporal)
+
+	    this.brain = new window.neurojs.Agent({
+
+	        actor: actor,
+	        critic: critic,
+
+	        states: states,
+	        actions: actions,
+
+	        algorithm: 'ddpg',
+
+	        temporalWindow: temporal, 
+
+	        discount: 0.98, 
+
+	        experience: 75e3, 
+	        learningPerTick: 40, 
+	        startLearningAt: 5000,
+
+	        theta: 1, // progressive copy
+
+	        alpha: 0 // advantage learning
+
+	    })
+
+	    this.brain.algorithm.critic.optimizedCentrally = true
+
+	    this.actions = actions
+	    this.car.addToWorld()
+		this.loaded = true
 	};
 
 	agent.prototype.step = function (dt) {
-	    this.car.update(dt);
+		if (!this.loaded) {
+			return 
+		}
+
+	    this.timer++
+
+	    if (this.timer % this.timerFrequency === 0) {
+	        var d = this.car.updateSensors()
+	        var vel = this.car.chassisBody.velocity
+	        var speed = this.car.speed.velocity
+
+	        this.reward = Math.pow(vel[1], 2) - 0.1 * Math.pow(vel[0], 2) - this.car.contact * 10 - this.car.impact * 20
+
+	        if (Math.abs(speed) < 1e-2) { // punish no movement; it harms exploration
+	            this.reward -= 1.0 
+	        }
+
+	        this.loss = this.brain.learn(this.reward)
+	        this.action = this.brain.policy(d)
+	        
+	        this.rewardBonus = 0.0
+	        this.car.impact = 0
+	    }
+	    
+	    if (this.action) {
+	        this.car.handle(this.action[0], this.action[1])
+	    }
+
+	    return this.timer % this.timerFrequency === 0
 	};
 
 	agent.prototype.draw = function (context) {
@@ -191,19 +308,20 @@
 	        ]
 	    };
 
-	    this.maxSteer = Math.PI / 7;
-	    this.maxEngineForce = 10;
-	    this.maxBrakeForce = 5;
-	    this.maxBackwardForce = 2;
-	    this.linearDamping = 0.5;
+	    this.maxSteer = Math.PI / 7
+	    this.maxEngineForce = 10
+	    this.maxBrakeForce = 5
+	    this.maxBackwardForce = 2
+	    this.linearDamping = 0.5
 
 	    this.continuous = true
-	    this.frequency = 15
-	    this.discount = .75
+
+	    this.contact = 0
+	    this.impact = 0
 
 	    this.world = world
 
-	    this.init();
+	    this.init()
 	};
 
 	car.TYPE = 2
@@ -211,135 +329,17 @@
 	car.prototype.init = function () {
 	    this.createPhysicalBody()
 
-	    this.dynamicForwardSensor = false
-
 	    this.sensors = sensors.build(this, this.options.sensors)
 	    this.speed = this.sensors[this.sensors.length - 1]
-	    
 
-	    this.createBrain()
-
-	    this.punishment = 0
-	    this.timer = 0.0
-	    
-	};
-
-	car.prototype.createBrain = function () {
-
-	    var states = 0
+	    this.states = 0 // sensor dimensonality
 
 	    for (var i = 0; i < this.sensors.length; i++) {
-	        states += this.sensors[i].dimensions
+	        this.states += this.sensors[i].dimensions
 	    }
-
-	    if (this.continuous) {
-
-	        var actions = 2 + (this.dynamicForwardSensor ? 1 : 0)
-	        var temporal = 1
-
-	        var input = window.neurojs.Agent.getInputDimension(states, actions, temporal)
-
-	        if(!car.actor) {
-	            car.actor = new window.neurojs.Network.Model([
-
-	                { type: 'input', size: input },
-	                { type: 'fc', size: 40, activation: 'relu' },
-	                { type: 'fc', size: 40, activation: 'relu' },
-	                { type: 'fc', size: 40, activation: 'relu', dropout: 0.5 },
-	                { type: 'fc', size: actions, activation: 'tanh' },
-	                { type: 'regression' }
-
-	            ])
-	        }
-
-	        if(!car.critic) {
-	            car.critic = new window.neurojs.Network.Model([
-
-	                { type: 'input', size: input + actions },
-	                { type: 'fc', size: 50, activation: 'relu' },
-	                { type: 'fc', size: 50, activation: 'relu' },
-	                { type: 'fc', size: 50, activation: 'relu' },
-	                { type: 'fc', size: 1 },
-	                { type: 'regression' }
-
-	            ]).newConfiguration()
-	            this.world.pool.critic = car.critic
-	        }
-
-	        if(!car.target) {
-	            car.target = car.critic.model.newConfiguration()
-	            this.world.pool.target = car.target
-	        }
-
-	        var exp_size = 5000 * this.frequency
-
-	        this.brain = new window.neurojs.Agent({
-
-	            actor: car.actor.newConfiguration(),
-	            critic: car.critic,
-
-	            targetCritic: car.target,
-
-	            states: states,
-	            actions: actions,
-
-	            algorithm: 'ddpg',
-
-	            temporalWindow: temporal, 
-
-	            discount: 0.98, // Math.pow(this.discount, 1.0 / this.frequency),
-
-	            experience: exp_size, 
-	            learningPerTick: 50, 
-	            startLearningAt: 5000,
-
-	            theta: 0.001,
-
-	            alpha: 0.1
-
-	        })
-
-	        // this.world.pool.add(this.brain)
-	        // window.neurojs.Loader.loadAgent('checkpoint/car-ddpg-1-age75000.bin', this.brain)
-
-	    }
-
-	    else {
-
-	        var actions = car.actions.length
-	        var temporal = 1
-
-	        var input = window.neurojs.Agent.getInputDimension(states, actions, temporal)
-
-	        var net = new window.neurojs.Network.Model([
-
-	            { type: 'input', size: input },
-	            { type: 'fc', size: 80, activation: 'relu' },
-	            { type: 'fc', size: 60, activation: 'relu' },
-	            { type: 'fc', size: actions },
-	            { type: 'regression' }
-
-	        ])
-
-	        this.brain = new window.neurojs.Agent({
-
-	            network: net.newConfiguration(),
-
-	            states: states,
-	            actions: actions,
-
-	            algorithm: 'dqn',
-
-	            temporalWindow: temporal, 
-
-	            discount: Math.pow(this.discount, 1.0 / this.frequency)
-
-	        })
-
-	    }
-
-	    this.states = states
-
+	    
+	    this.punishment = 0
+	    this.timer = 0.0
 	};
 
 	car.prototype.createPhysicalBody = function () {
@@ -422,10 +422,6 @@
 	    this.backWheel.setSideFriction(45) // Less side friction on back wheel makes it easier to drift
 	};
 
-	car.prototype.update = function (dt) {
-	    this.updateBrain(dt)
-	};
-
 	car.prototype.updateSensors = function () {
 	    var data = new Float64Array(this.states)
 	    for (var i = 0, k = 0; i < this.sensors.length; k += this.sensors[i].dimensions, i++) {
@@ -442,44 +438,6 @@
 	    return data
 	};
 
-	car.actions = [ [ 0, -1 ], [ 0, +1 ], [ 1, -1 ], [ 1, +1 ], [ -1, -1 ], [ -1, +1 ], [ 1, 0 ], [ -1, 0 ], [ 0, 0 ] ]
-	car.prototype.updateBrain = function (dt) {
-	    this.timer += dt
-
-	    if (this.timer >= 1.0 / this.frequency) {
-	        var d = this.updateSensors()
-
-	        var r = Math.pow(this.chassisBody.velocity[1], 2)
-	             - 0.3 * Math.pow(this.chassisBody.velocity[0], 2)
-	             - this.punishment;
-
-	        if (Math.abs(this.speed.velocity) < 1e-2) { // punish no movement; it harms exploration
-	            r -= 1.0 
-	        }
-
-	        this.brain.learn(r)
-
-	        if (this.continuous) {
-	            this.action = this.brain.policy(d)
-	        }
-
-	        else {
-	            var action_idx = this.brain.policy(d)
-	            this.action = car.actions[action_idx]
-	        }
-
-	        if (this.dynamicForwardSensor) {
-	            this.sensors[0].updateLength((0.5 + 0.5 * this.action[2]) * 25)
-	            this.sensors[0].highlighted = true
-	        }
-	        
-	        this.timer = 0.0
-	        this.punishment = 0.0
-	    }
-	    
-	    if (this.action)
-	        this.handle(this.action[0], this.action[1])
-	};
 
 	car.prototype.drawSensors = function () {
 	    if (this.overlay.visible !== true) {
@@ -494,13 +452,37 @@
 	};
 
 	car.prototype.addToWorld = function () {
-	    this.world.p2.addBody(this.chassisBody);
-	    this.vehicle.addToWorld(this.world.p2);
+	    this.chassisBody.position[0] = (Math.random() - .5) * this.world.size.w
+	    this.chassisBody.position[1] = (Math.random() - .5) * this.world.size.h
+	    this.chassisBody.angle = (Math.random() * 2.0 - 1.0) * Math.PI
 
-	   this.world.p2.on("beginContact",(function(event){
-	    if (event.bodyA === this.chassisBody || event.bodyB === this.chassisBody)
-	        this.punishment = Math.max(5 * Math.pow(this.chassisBody.velocity[1], 2), 50.0); 
-	   }).bind(this));
+	    this.world.p2.addBody(this.chassisBody)
+	    this.vehicle.addToWorld(this.world.p2)
+
+	   this.world.p2.on("beginContact", (event) => {
+
+	        if ((event.bodyA === this.chassisBody || event.bodyB === this.chassisBody)) {
+	            // this.onContact( Math.pow(this.chassisBody.velocity[1], 2) + Math.pow(this.chassisBody.velocity[0], 2) );
+	            this.contact++;
+	        }
+
+	   });
+
+	   this.world.p2.on("endContact", (event) => {
+
+	        if ((event.bodyA === this.chassisBody || event.bodyB === this.chassisBody)) {
+	            this.contact--;
+	        }
+
+	   })
+
+	   this.world.p2.on("impact", (event) => {
+
+	        if ((event.bodyA === this.chassisBody || event.bodyB === this.chassisBody)) {
+	            this.impact = Math.sqrt(Math.pow(this.chassisBody.velocity[0], 2) + Math.pow(this.chassisBody.velocity[1], 2))
+	        }
+
+	   })
 	};
 
 	car.prototype.handleKeyInput = function (k) {
@@ -556,6 +538,7 @@
 	    this.wheels.topLeft.rotation = this.frontWheel.steerValue * 0.7071067812
 	    this.wheels.topRight.rotation = this.frontWheel.steerValue * 0.7071067812
 	};
+
 
 	module.exports = car;
 
@@ -2130,15 +2113,19 @@
 
 /***/ },
 /* 9 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ function(module, exports) {
 
-	var color = __webpack_require__(4)
+	
 
 	function renderer(world, container) {
 	    this.world = world;
-	    this.world.p2.on("addBody", (function(e){
-	        this.add_body(e.body);
-	    }).bind(this));
+	    this.world.p2.on("addBody", (e) => {
+	        this.add_body(e.body)
+	    });
+
+	    this.world.p2.on("removeBody", (e) => {
+	        this.remove_body(e.body)
+	    })
 
 	    if (container) {
 	        this.elementContainer = container
@@ -2367,6 +2354,18 @@
 	    }
 	};
 
+	renderer.prototype.remove_body = function (body) {
+	    if (body.gl_sprite) {
+	        this.stage.removeChild(body.gl_sprite)
+
+	        for (var i = this.bodies.length; --i; ) {
+	            if (this.bodies[i] === body) {
+	                this.bodies.splice(i, 1);
+	            }
+	        }
+	    }
+	};
+
 	renderer.prototype.zoom = function (factor) {
 	    this.viewport.scale *= factor;
 	};
@@ -2396,20 +2395,13 @@
 
 	renderer.prototype.mouseup = function (pos) {
 	    if (this.drawPoints.length > 2) {    
-	        console.log(JSON.stringify(this.drawPoints))
-
-	        var b = new p2.Body({ mass : 0.0 });
-	        b.color = color.randomPastelHex()
-	        if(b.fromPolygon(this.drawPoints, {
-	            removeCollinearPoints: 0.1
-	        })) {
-	             this.world.p2.addBody(b)
-	        }
+	        this.world.addBodyFromPoints(this.drawPoints)
 	    }
 
 	    this.drawPoints = []
-
+	    this.drawingGraphic.clear()
 	};
+
 
 	module.exports = renderer;
 
@@ -2417,7 +2409,8 @@
 /* 10 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var agent = __webpack_require__(2);
+	var agent = __webpack_require__(2)
+	var color = __webpack_require__(4)
 
 	function world() {
 	    this.agents = [];
@@ -2425,15 +2418,90 @@
 	        gravity : [0,0]
 	    });
 
-	    this.p2.solver.tolerance = 0.4
-	    this.p2.solver.iterations = 10
-	    this.p2.setGlobalStiffness(4000)
-	    this.p2.setGlobalRelaxation(8)
+	    this.p2.solver.tolerance = 5e-2
+	    this.p2.solver.iterations = 15
+	    this.p2.setGlobalStiffness(1e6)
+	    this.p2.setGlobalRelaxation(5)
 
 	    this.age = 0.0
+	    this.timer = 0
 
-	    this.pool = new window.neurojs.MultiAgentPool()
-	}
+	    this.chartData = {}
+	    this.chartEphemeralData = []
+	    this.chartFrequency = 60
+	    this.chartDataPoints = 200
+
+	    this.obstacles = []
+
+	    var input = 118, actions = 2
+	    this.brains = {
+
+	        actor: new window.neurojs.Network.Model([
+
+	            { type: 'input', size: input },
+	            { type: 'fc', size: 50, activation: 'relu' },
+	            { type: 'fc', size: 50, activation: 'relu' },
+	            { type: 'fc', size: 50, activation: 'relu', dropout: 0.5 },
+	            { type: 'fc', size: actions, activation: 'tanh' },
+	            { type: 'regression' }
+
+	        ]),
+
+
+	        critic: new window.neurojs.Network.Model([
+
+	            { type: 'input', size: input + actions },
+	            { type: 'fc', size: 100, activation: 'relu' },
+	            { type: 'fc', size: 100, activation: 'relu' },
+	            { type: 'fc', size: 1 },
+	            { type: 'regression' }
+
+	        ])
+
+	    }
+
+	    this.brains.shared = {
+	        critic: this.brains.critic.newConfiguration()
+	    }
+	};
+
+	world.prototype.addBodyFromCompressedPoints = function (outline) {
+	    if (outline.length % 2 !== 0) {
+	        throw 'Invalid outline.';
+	    }
+
+	    var points = []
+	    for (var i = 0; i < (outline.length / 2); i++) {
+	        var x = outline[i * 2 + 0]
+	        var y = outline[i * 2 + 1]
+	        points.push([ x, y ])
+	    }
+
+	    this.addBodyFromPoints(points)
+	};
+
+	world.prototype.addBodyFromPoints = function (points) {
+	    var body = new p2.Body({ mass : 0.0 });
+	    body.color = color.randomPastelHex()
+
+	    if(!body.fromPolygon(points.slice(0), { removeCollinearPoints: 0.1 })) {
+	        return 
+	    }
+
+	    var outline = new Float64Array(points.length * 2)
+	    for (var i = 0; i < points.length; i++) {
+	        outline[i * 2 + 0] = points[i][0]
+	        outline[i * 2 + 1] = points[i][1]
+	    }
+
+	    body.outline = outline
+	    this.addObstacle(body)
+	};
+
+	world.prototype.addObstacle = function (obstacle) {
+	    this.p2.addBody(obstacle)
+	    this.obstacles.push(obstacle)
+	};
 
 	world.prototype.addWall = function (start, end, width) {
 	    var w = 0, h = 0, pos = []
@@ -2480,13 +2548,7 @@
 	    
 	}
 
-	world.prototype.init = function (n, renderer) {
-	    for (var i = 0; i < n; i++) {
-	        var ag = new agent(this);
-	        ag.car.addToWorld();
-	        this.agents.push(ag);
-	    }
-
+	world.prototype.init = function (renderer) {
 	    window.addEventListener('resize', this.resize.bind(this, renderer), false);
 
 	    var w = renderer.viewport.width / renderer.viewport.scale
@@ -2497,6 +2559,15 @@
 	    this.addWall( [ wx + 0.25, -hx ], [ wx + 0.25, hx ], 0.5 )
 	    this.addWall( [ -wx, -hx - 0.25 ], [ wx, -hx - 0.25 ], 0.5 )
 	    this.addWall( [ -wx, hx + 0.25 ], [ wx, hx + 0.25 ], 0.5 )
+
+	    this.size = { w, h }
+	};
+
+	world.prototype.populate = function (n) {
+	    for (var i = 0; i < n; i++) {
+	        var ag = new agent({}, this);
+	        this.agents.push(ag);
+	    }
 	};
 
 	world.prototype.resize = function (renderer) {
@@ -2505,12 +2576,129 @@
 	world.prototype.step = function (dt) {
 	    if (dt >= 0.02)  dt = 0.02;
 
+	    ++this.timer
+
+	    var loss = 0.0, reward = 0.0, agentUpdate = false
 	    for (var i = 0; i < this.agents.length; i++) {
-	        this.agents[i].step(dt);
+	        agentUpdate = this.agents[i].step(dt);
+	        loss += this.agents[i].loss
+	        reward += this.agents[i].reward
 	    }
+
+	    if (agentUpdate && this.agents[0].brain.training && this.agents[0].brain.algorithm.critic.optimizedCentrally) {
+	        this.agents[0].brain.algorithm.critic.config.optimize(false)
+	    }
+
+	    if (!this.plotting && this.agents[0].brain.training && 1 === this.timer % this.chartFrequency) {
+	        this.plotting = true
+	    }
+
+	    if (this.plotting) {
+	        this.chartEphemeralData.push({
+	            loss: loss / this.agents.length, 
+	            reward: reward / this.agents.length
+	        })
+
+	        if (this.timer % this.chartFrequency == 0) {
+	            this.updateChart()
+	            this.chartEphemeralData = []
+	        }
+	    }
+	    
 
 	    this.p2.step(1 / 60, dt, 10);
 	    this.age += dt
+	};
+
+	world.prototype.updateChart = function () {
+	    var point = { loss: 0, reward: 0 }
+
+	    if (this.chartEphemeralData.length !== this.chartFrequency) {
+	        throw 'error'
+	    }
+
+	    for (var i = 0; i < this.chartFrequency; i++) {
+	        var subpoint = this.chartEphemeralData[i]
+	        for (var key in point) {
+	            point[key] += subpoint[key]
+	        }
+	    }
+
+	    var series = []
+	    for (var key in point) {
+	        if (!(key in this.chartData)) {
+	            this.chartData[key] = []
+	        }
+
+	        this.chartData[key].push(point[key] / this.chartFrequency)
+
+	        if (this.chartData[key].length > this.chartDataPoints) {
+	            this.chartData[key] = this.chartData[key].slice(-this.chartDataPoints)
+	        }
+
+	        series.push({
+	            name: key,
+	            data: this.chartData[key]
+	        })
+	    }
+
+	    this.chart.update({
+	        series
+	    })
+	};
+
+	world.prototype.export = function () {
+	    var contents = []
+	    contents.push({
+	        obstacles: this.obstacles.length
+	    })
+
+	    for (var i = 0; i < this.obstacles.length; i++) {
+	        contents.push(this.obstacles[i].outline)
+	    }
+
+	    var agents = []
+	    for (var i = 0; i < this.agents.length; i++) {
+	        agents.push({
+	            location: this.agents[i].car.chassisBody.position,
+	            angle: this.agents[i].car.chassisBody.angle
+	        })
+	    }
+
+	    contents.push(agents)
+
+	    return window.neurojs.Binary.Writer.write(contents)
+	};
+
+	world.prototype.clearObstacles = function () {
+	    for (var i = 0; i < this.obstacles.length; i++) {
+	        this.p2.removeBody(this.obstacles[i])
+	    }
+
+	    this.obstacles = []
+	};
+
+	world.prototype.import = function (buf) {
+	    this.clearObstacles()
+
+	    var contents = window.neurojs.Binary.Reader.read(buf)
+	    var j = -1
+	    var meta = contents[++j]
+
+	    for (var i = 0; i < meta.obstacles; i++) {
+	        this.addBodyFromCompressedPoints(contents[++j])
+	    }
+
+	    var agents = contents[++j]
+
+	    if (agents.length !== this.agents.length) {
+	        throw 'error';
+	    }
+
+	    for (var i = 0; i < agents.length; i++) {
+	        this.agents[i].car.chassisBody.position = agents[i].location
+	        this.agents[i].car.chassisBody.angle = agents[i].angle
+	    }
 	};
 
 	module.exports = world;

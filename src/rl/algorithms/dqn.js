@@ -1,6 +1,6 @@
+var Algorithm = require('./algorithm.js')
 
-
-class DQN {
+class DQN extends Algorithm {
 
 	constructor(agent) {
 		// options

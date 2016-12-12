@@ -1,5 +1,9 @@
 "use strict";
 
+if (!require('./util/support.js')()) {
+	throw 'env unsupported';
+}
+
 require('./math/statistics.js')
 
 var neurojs = {
@@ -9,7 +13,9 @@ var neurojs = {
 	Optim: require('./optim.js'),
 	Loader: require('./loader.js'),
 	Buffers: require('./rl/replay-buffers.js'),
-	MultiAgentPool: require('./rl/multi-agent-pool.js')
+	NetOnDisk: require('./storage.js'),
+	FileLoader: require('./util/downloader.js'),
+	Binary: require('./util/file.js')
 
 }
 

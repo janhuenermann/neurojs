@@ -1,10 +1,14 @@
-var color = require('./color.js')
+
 
 function renderer(world, container) {
     this.world = world;
-    this.world.p2.on("addBody", (function(e){
-        this.add_body(e.body);
-    }).bind(this));
+    this.world.p2.on("addBody", (e) => {
+        this.add_body(e.body)
+    });
+
+    this.world.p2.on("removeBody", (e) => {
+        this.remove_body(e.body)
+    })
 
     if (container) {
         this.elementContainer = container
@@ -233,6 +237,18 @@ renderer.prototype.add_body = function (body) {
     }
 };
 
+renderer.prototype.remove_body = function (body) {
+    if (body.gl_sprite) {
+        this.stage.removeChild(body.gl_sprite)
+
+        for (var i = this.bodies.length; --i; ) {
+            if (this.bodies[i] === body) {
+                this.bodies.splice(i, 1);
+            }
+        }
+    }
+};
+
 renderer.prototype.zoom = function (factor) {
     this.viewport.scale *= factor;
 };
@@ -262,19 +278,12 @@ renderer.prototype.mousemove = function (pos) {
 
 renderer.prototype.mouseup = function (pos) {
     if (this.drawPoints.length > 2) {    
-        console.log(JSON.stringify(this.drawPoints))
-
-        var b = new p2.Body({ mass : 0.0 });
-        b.color = color.randomPastelHex()
-        if(b.fromPolygon(this.drawPoints, {
-            removeCollinearPoints: 0.1
-        })) {
-             this.world.p2.addBody(b)
-        }
+        this.world.addBodyFromPoints(this.drawPoints)
     }
 
     this.drawPoints = []
-
+    this.drawingGraphic.clear()
 };
+
 
 module.exports = renderer;

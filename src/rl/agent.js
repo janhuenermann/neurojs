@@ -27,7 +27,7 @@ class Agent {
 			algorithm: 'ddpg',
 
 			discount: opt.discount || 0.95,
-			beta: 0.5, // how to prioritise experiences (0 = no prioritisation, 1 = full prioritisation)
+			beta: 0.15, // how to prioritise experiences (0 = no prioritisation, 1 = full prioritisation)
 
 		}, opt)
 
@@ -80,13 +80,15 @@ class Agent {
 	}
 
 	actionToVector(action) {
-		if (action instanceof Float64Array)
+		if (action instanceof Float64Array) {
 			return action
+		}
 
-		if (Number.isInteger(action))
+		if (Number.isInteger(action)) {
 			return Float64Array.oneHot(action, this.actions)
+		}
 
-		throw 'action invalid'
+		throw 'Action is invalid'
 	}
 
 	getStateInputVector(state) {
@@ -135,7 +137,7 @@ class Agent {
 	 */
 	learn(reward) {
 		if (!this.acted || !this.ready)
-			return 
+			return
 
 		this.acted = false
 		this.history.rewards.push(reward)
@@ -159,15 +161,15 @@ class Agent {
 		// Get older
 		++this.age 
 
-		if (this.pool)
-			return 0.0
-
 		return this.backward()
 	}
 
 	backward() {
 		if (this.options.startLearningAt > this.age)
 			return false
+
+		// Set training
+		this.training = true
 
 		// Learn batch
 		var loss = this.replay()
@@ -201,7 +203,7 @@ class Agent {
 	}
 
 	evaluate(state, target) {
-		return this.value(state, this.act(state, target), target)
+		return this.algorithm.evaluate(state, target)
 	}
 
 
@@ -209,10 +211,6 @@ class Agent {
 	// utility functions
 	export() {
 		return this.algorithm.export()
-	}
-
-	import(params) {
-		return this.algorithm.import(params)
 	}
 
 	static getInputDimension(states, actions, temporalWindow) {

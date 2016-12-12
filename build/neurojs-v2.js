@@ -46,16 +46,22 @@
 
 	"use strict";
 
-	__webpack_require__(1)
+	if (!__webpack_require__(1)()) {
+		throw 'env unsupported';
+	}
+
+	__webpack_require__(3)
 
 	var neurojs = {
 
-		Network: __webpack_require__(2),
-		Agent: __webpack_require__(27),
-		Optim: __webpack_require__(12),
-		Loader: __webpack_require__(33),
-		Buffers: __webpack_require__(30),
-		MultiAgentPool: __webpack_require__(34)
+		Network: __webpack_require__(4),
+		Agent: __webpack_require__(29),
+		Optim: __webpack_require__(14),
+		Loader: __webpack_require__(39),
+		Buffers: __webpack_require__(32),
+		NetOnDisk: __webpack_require__(36),
+		FileLoader: __webpack_require__(40),
+		Binary: __webpack_require__(37)
 
 	}
 
@@ -68,6 +74,229 @@
 
 /***/ },
 /* 1 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/* WEBPACK VAR INJECTION */(function(process) {function CheckSupport() {
+
+		if (process !== undefined && !process.browser) {
+			if (process.version.indexOf('v') !== 0) {
+				throw 'unknown node version.';
+			}
+
+			var vn = process.version.substring(1).split('.');
+			var major = parseInt(vn[0]);
+			var minor = parseInt(vn[1]);
+		
+			if (major > 6) return true;
+			if (major === 6 && minor >= 6) return true;
+
+			return false;
+		}
+
+		else if (typeof window !== 'undefined') {
+			var supported = {
+				'safari': 10,
+				'chrome': 54
+			};
+
+			return true;
+		}
+
+		return true;
+
+	}
+
+	module.exports = CheckSupport;
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(2)))
+
+/***/ },
+/* 2 */
+/***/ function(module, exports) {
+
+	// shim for using process in browser
+	var process = module.exports = {};
+
+	// cached from whatever global is present so that test runners that stub it
+	// don't break things.  But we need to wrap it in a try catch in case it is
+	// wrapped in strict mode code which doesn't define any globals.  It's inside a
+	// function because try/catches deoptimize in certain engines.
+
+	var cachedSetTimeout;
+	var cachedClearTimeout;
+
+	function defaultSetTimout() {
+	    throw new Error('setTimeout has not been defined');
+	}
+	function defaultClearTimeout () {
+	    throw new Error('clearTimeout has not been defined');
+	}
+	(function () {
+	    try {
+	        if (typeof setTimeout === 'function') {
+	            cachedSetTimeout = setTimeout;
+	        } else {
+	            cachedSetTimeout = defaultSetTimout;
+	        }
+	    } catch (e) {
+	        cachedSetTimeout = defaultSetTimout;
+	    }
+	    try {
+	        if (typeof clearTimeout === 'function') {
+	            cachedClearTimeout = clearTimeout;
+	        } else {
+	            cachedClearTimeout = defaultClearTimeout;
+	        }
+	    } catch (e) {
+	        cachedClearTimeout = defaultClearTimeout;
+	    }
+	} ())
+	function runTimeout(fun) {
+	    if (cachedSetTimeout === setTimeout) {
+	        //normal enviroments in sane situations
+	        return setTimeout(fun, 0);
+	    }
+	    // if setTimeout wasn't available but was latter defined
+	    if ((cachedSetTimeout === defaultSetTimout || !cachedSetTimeout) && setTimeout) {
+	        cachedSetTimeout = setTimeout;
+	        return setTimeout(fun, 0);
+	    }
+	    try {
+	        // when when somebody has screwed with setTimeout but no I.E. maddness
+	        return cachedSetTimeout(fun, 0);
+	    } catch(e){
+	        try {
+	            // When we are in I.E. but the script has been evaled so I.E. doesn't trust the global object when called normally
+	            return cachedSetTimeout.call(null, fun, 0);
+	        } catch(e){
+	            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error
+	            return cachedSetTimeout.call(this, fun, 0);
+	        }
+	    }
+
+
+	}
+	function runClearTimeout(marker) {
+	    if (cachedClearTimeout === clearTimeout) {
+	        //normal enviroments in sane situations
+	        return clearTimeout(marker);
+	    }
+	    // if clearTimeout wasn't available but was latter defined
+	    if ((cachedClearTimeout === defaultClearTimeout || !cachedClearTimeout) && clearTimeout) {
+	        cachedClearTimeout = clearTimeout;
+	        return clearTimeout(marker);
+	    }
+	    try {
+	        // when when somebody has screwed with setTimeout but no I.E. maddness
+	        return cachedClearTimeout(marker);
+	    } catch (e){
+	        try {
+	            // When we are in I.E. but the script has been evaled so I.E. doesn't  trust the global object when called normally
+	            return cachedClearTimeout.call(null, marker);
+	        } catch (e){
+	            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error.
+	            // Some versions of I.E. have different rules for clearTimeout vs setTimeout
+	            return cachedClearTimeout.call(this, marker);
+	        }
+	    }
+
+
+
+	}
+	var queue = [];
+	var draining = false;
+	var currentQueue;
+	var queueIndex = -1;
+
+	function cleanUpNextTick() {
+	    if (!draining || !currentQueue) {
+	        return;
+	    }
+	    draining = false;
+	    if (currentQueue.length) {
+	        queue = currentQueue.concat(queue);
+	    } else {
+	        queueIndex = -1;
+	    }
+	    if (queue.length) {
+	        drainQueue();
+	    }
+	}
+
+	function drainQueue() {
+	    if (draining) {
+	        return;
+	    }
+	    var timeout = runTimeout(cleanUpNextTick);
+	    draining = true;
+
+	    var len = queue.length;
+	    while(len) {
+	        currentQueue = queue;
+	        queue = [];
+	        while (++queueIndex < len) {
+	            if (currentQueue) {
+	                currentQueue[queueIndex].run();
+	            }
+	        }
+	        queueIndex = -1;
+	        len = queue.length;
+	    }
+	    currentQueue = null;
+	    draining = false;
+	    runClearTimeout(timeout);
+	}
+
+	process.nextTick = function (fun) {
+	    var args = new Array(arguments.length - 1);
+	    if (arguments.length > 1) {
+	        for (var i = 1; i < arguments.length; i++) {
+	            args[i - 1] = arguments[i];
+	        }
+	    }
+	    queue.push(new Item(fun, args));
+	    if (queue.length === 1 && !draining) {
+	        runTimeout(drainQueue);
+	    }
+	};
+
+	// v8 likes predictible objects
+	function Item(fun, array) {
+	    this.fun = fun;
+	    this.array = array;
+	}
+	Item.prototype.run = function () {
+	    this.fun.apply(null, this.array);
+	};
+	process.title = 'browser';
+	process.browser = true;
+	process.env = {};
+	process.argv = [];
+	process.version = ''; // empty string to avoid regexp issues
+	process.versions = {};
+
+	function noop() {}
+
+	process.on = noop;
+	process.addListener = noop;
+	process.once = noop;
+	process.off = noop;
+	process.removeListener = noop;
+	process.removeAllListeners = noop;
+	process.emit = noop;
+
+	process.binding = function (name) {
+	    throw new Error('process.binding is not supported');
+	};
+
+	process.cwd = function () { return '/' };
+	process.chdir = function (dir) {
+	    throw new Error('process.chdir is not supported');
+	};
+	process.umask = function() { return 0; };
+
+
+/***/ },
+/* 3 */
 /***/ function(module, exports) {
 
 	if (Float64Array.prototype.fill === undefined)
@@ -224,31 +453,34 @@
 
 
 /***/ },
-/* 2 */
+/* 4 */
 /***/ function(module, exports, __webpack_require__) {
 
 	"use strict";
 
-	var dot = __webpack_require__(3);
-	var dropout = __webpack_require__(5);
-	var nonlinear = __webpack_require__(6);
-	var input = __webpack_require__(7);
-	var regression = __webpack_require__(8);
-	var noise = __webpack_require__(9);
-	var bayesian = __webpack_require__(10)
+	var dot = __webpack_require__(5)
+	var dropout = __webpack_require__(7)
+	var nonlinear = __webpack_require__(8)
+	var input = __webpack_require__(9)
+	var regression = __webpack_require__(10)
+	var noise = __webpack_require__(11)
+	var bayesian = __webpack_require__(12)
 
-	var Size = __webpack_require__(4);
-	var Tensor = __webpack_require__(11);
-	var Optim = __webpack_require__(12);
+	var Size = __webpack_require__(6)
+	var Tensor = __webpack_require__(13)
+	var Optim = __webpack_require__(14)
+
+	var SharedConfiguration = __webpack_require__(15)
 
 	if (typeof window === 'undefined') {
-		__webpack_require__(13);
+		__webpack_require__(16);
 	}
 
 	// defines how the network looks; which layers etc.
 	class Model {
 
 		constructor(opt) {
+			this.representation = opt
 			this.build(opt)
 		}
 
@@ -398,7 +630,6 @@
 		static create(inp, opt) {
 			switch (opt.type) {
 				case 'fc': return new dot.FullyConnectedLayer(inp, opt)
-				case 'fc-sa': return new dot.FullyConnectedLayerSelfAware(inp, opt)
 				case 'dropout': return new dropout.DropOutLayer(inp, opt)
 				case 'sigmoid': return new nonlinear.SigmoidLayer(inp, opt)
 				case 'tanh': return new nonlinear.TanhLayer(inp, opt)
@@ -419,7 +650,7 @@
 	// defines how the network behaves; parameter/weights etc.
 	class Configuration {
 
-		constructor(model, parameters) {
+		constructor(model, parameters, optimizer) {
 			this.model = model
 			this.parameters = []
 			this.optimizer = null
@@ -432,7 +663,7 @@
 				}
 
 				var param = this.parameters[i] = new Tensor(layer.dimensions.parameters)
-				if (parameters && parameters.length === this.model.layers.length) // copy from
+				if (parameters && i in parameters) // copy from
 					param.w.set(parameters[i].w)
 				else if (layer.initialize) // initialize as new parameters
 					layer.initialize(param)
@@ -442,6 +673,9 @@
 				this.countOfParameters += layer.dimensions.parameters
 			}
 
+			if (optimizer) {
+				this.useOptimizer(optimizer)
+			}
 		}
 
 
@@ -495,12 +729,12 @@
 			return new State(this)
 		}
 
-		duplicate() {
-			return new Configuration(this.model, this.optimizer, this.parameters)
+		clone() {
+			return new Configuration(this.model, this.parameters, this.optimizer)
 		}
 
 
-		read(arr) {
+		putWeights(arr) {
 			var joined = arr
 
 			if (arr.length !== this.countOfParameters)
@@ -517,7 +751,7 @@
 			}
 		}
 
-		write() {
+		pullWeights() {
 			var joined = new Float64Array(this.countOfParameters)
 
 			for (var i = 0, p = 0; i < this.parameters.length; i++) { 
@@ -531,6 +765,11 @@
 			}
 
 			return joined
+		}
+
+
+		share() {
+			return new SharedConfiguration(this)
 		}
 
 	}
@@ -697,12 +936,12 @@
 	};
 
 /***/ },
-/* 3 */
+/* 5 */
 /***/ function(module, exports, __webpack_require__) {
 
 	"use strict";
 
-	var Size = __webpack_require__(4);
+	var Size = __webpack_require__(6);
 
 	class FullyConnectedLayer {
 
@@ -714,11 +953,13 @@
 				output: opt.size,
 				parameters: input.length * opt.size.length + opt.size.length
 			}
+			
 		}
 
 		forward(ctx) {
 			var sum = 0.0, X = this.dimensions.input.length, Y = this.dimensions.output.length
 			var inpw = ctx.input.w, outw = ctx.output.w, paramw = ctx.params.w
+			
 
 			for (var i = 0; i < Y; i++) {
 				sum = 0.0
@@ -728,6 +969,8 @@
 
 				outw[i] = sum + paramw[X * Y + i]
 			}
+
+			// outw.set(this.fwd(inpw, paramw));
 		}
 
 		backward(ctx) {
@@ -774,26 +1017,35 @@
 	}
 
 /***/ },
-/* 4 */
+/* 6 */
 /***/ function(module, exports) {
 
 	module.exports = class Size {
 
 		static derive(val) {
-			if (val instanceof Size)
+			if (val instanceof Size) {
 				return val;
+			}
 
-			if (Number.isInteger(val))
-				return new Size(1, 1, val);
+			if (Number.isInteger(val)) {
+				return new Size(1, 1, val)
+			}
 
-			throw "could not derive size";
+			if (val instanceof Object) {
+				return new Size(val.x, val.y, val.z)
+			}
+
+			throw "Could not create size object";
 		}
 
 		constructor(x, y, z) {
-			this.x = x;
-			this.y = y;
-			this.z = z;
-			this.length = this.x * this.y * this.z;
+			this.x = x
+			this.y = y
+			this.z = z
+		}
+
+		get length() {
+			return this.x * this.y * this.z
 		}
 
 		get dimensions() {
@@ -812,7 +1064,7 @@
 	}
 
 /***/ },
-/* 5 */
+/* 7 */
 /***/ function(module, exports) {
 
 	"use strict";
@@ -882,7 +1134,7 @@
 	};
 
 /***/ },
-/* 6 */
+/* 8 */
 /***/ function(module, exports) {
 
 	"use strict";
@@ -981,12 +1233,12 @@
 	};
 
 /***/ },
-/* 7 */
+/* 9 */
 /***/ function(module, exports, __webpack_require__) {
 
 	"use strict";
 
-	var Size = __webpack_require__(4);
+	var Size = __webpack_require__(6);
 
 	class InputLayer {
 
@@ -1026,7 +1278,7 @@
 	}
 
 /***/ },
-/* 8 */
+/* 10 */
 /***/ function(module, exports) {
 
 	"use strict";
@@ -1157,7 +1409,7 @@
 
 
 /***/ },
-/* 9 */
+/* 11 */
 /***/ function(module, exports) {
 
 	
@@ -1203,12 +1455,12 @@
 
 
 /***/ },
-/* 10 */
+/* 12 */
 /***/ function(module, exports, __webpack_require__) {
 
 	"use strict";
 
-	var Size = __webpack_require__(4);
+	var Size = __webpack_require__(6);
 
 	// http://arxiv.org/pdf/1505.05424.pdf
 	class VariationalBayesianLayer {
@@ -1374,10 +1626,10 @@
 	}
 
 /***/ },
-/* 11 */
+/* 13 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var Size = __webpack_require__(4);
+	var Size = __webpack_require__(6);
 
 	module.exports = class Tensor {
 
@@ -1390,7 +1642,7 @@
 	}
 
 /***/ },
-/* 12 */
+/* 14 */
 /***/ function(module, exports) {
 
 	"use strict";
@@ -1677,10 +1929,96 @@
 
 
 /***/ },
-/* 13 */
+/* 15 */
+/***/ function(module, exports) {
+
+	class EventRadio {
+
+		constructor() {
+			this.events = {}
+		}
+
+
+		on(event, callback) {
+			if (!(event in this.events)) {
+				this.events[event] = []
+			}
+
+			this.events[event].push(callback)
+		}
+
+		trigger(event, args = []) {
+			if (event in this.events) {
+				for (var i = 0; i < this.events[event].length; i++) {
+					this.events[event][i].apply(undefined, [this].concat(args));
+				}
+			}
+		}
+
+	}
+
+	class NetworkPool extends EventRadio {
+
+		constructor(names) {
+			this.states = {}
+		}
+
+		add(name, wrapper) {
+			this.states[name] = wrapper
+			wrapper.pool = this
+		}
+
+		set(name, value) {
+		}
+
+		dispatchOptimization() {
+		}
+
+	}
+
+	class NetworkWrapper extends EventRadio {
+
+		set(value) {
+			var state
+
+			if (value.constructor.name === 'State') {
+				state = value
+			}
+
+			else if (value.constructor.name === 'Configuration' || value.constructor.name === 'Model') {
+				state = value.newState()
+			}
+
+			this.net = state
+			this.config = state.configuration
+			this.model = state.model
+
+			this.trigger('set', [ state ])
+		}
+
+		useOptimizer(optim) {
+			this.optim = optim
+
+			this.on('set', () => {
+				if (this.optim !== undefined)
+					this.config.useOptimizer(this.optim)
+			})
+
+			if (this.config)
+				this.config.useOptimizer(optim)
+		}
+
+	}
+
+	module.exports = {
+		NetworkWrapper, NetworkPool
+	}
+
+/***/ },
+/* 16 */
 /***/ function(module, exports, __webpack_require__) {
 
-	/* WEBPACK VAR INJECTION */(function(module) {var colors = __webpack_require__(15);
+	/* WEBPACK VAR INJECTION */(function(module) {var colors = __webpack_require__(18);
 	module['exports'] = colors;
 
 	// Remark: By default, colors will add style properties to String.prototype
@@ -1691,11 +2029,11 @@
 	//   colors.red("foo")
 	//
 	//
-	__webpack_require__(22)();
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(14)(module)))
+	__webpack_require__(24)();
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(17)(module)))
 
 /***/ },
-/* 14 */
+/* 17 */
 /***/ function(module, exports) {
 
 	module.exports = function(module) {
@@ -1711,7 +2049,7 @@
 
 
 /***/ },
-/* 15 */
+/* 18 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(module) {/*
@@ -1749,10 +2087,10 @@
 
 	colors.themes = {};
 
-	var ansiStyles = colors.styles = __webpack_require__(16);
+	var ansiStyles = colors.styles = __webpack_require__(19);
 	var defineProps = Object.defineProperties;
 
-	colors.supportsColor = __webpack_require__(17);
+	colors.supportsColor = __webpack_require__(20);
 
 	if (typeof colors.enabled === "undefined") {
 	  colors.enabled = colors.supportsColor;
@@ -1851,7 +2189,7 @@
 	colors.setTheme = function (theme) {
 	  if (typeof theme === 'string') {
 	    try {
-	      colors.themes[theme] = __webpack_require__(19)(theme);
+	      colors.themes[theme] = __webpack_require__(21)(theme);
 	      applyTheme(colors.themes[theme]);
 	      return colors.themes[theme];
 	    } catch (err) {
@@ -1882,15 +2220,15 @@
 	};
 
 	// custom formatter methods
-	colors.trap = __webpack_require__(20);
-	colors.zalgo = __webpack_require__(21);
+	colors.trap = __webpack_require__(22);
+	colors.zalgo = __webpack_require__(23);
 
 	// maps
 	colors.maps = {};
-	colors.maps.america = __webpack_require__(23);
-	colors.maps.zebra = __webpack_require__(26);
-	colors.maps.rainbow = __webpack_require__(24);
-	colors.maps.random = __webpack_require__(25)
+	colors.maps.america = __webpack_require__(25);
+	colors.maps.zebra = __webpack_require__(28);
+	colors.maps.rainbow = __webpack_require__(26);
+	colors.maps.random = __webpack_require__(27)
 
 	for (var map in colors.maps) {
 	  (function(map){
@@ -1901,10 +2239,10 @@
 	}
 
 	defineProps(colors, init());
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(14)(module)))
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(17)(module)))
 
 /***/ },
-/* 16 */
+/* 19 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(module) {/*
@@ -1984,10 +2322,10 @@
 	  style.open = '\u001b[' + val[0] + 'm';
 	  style.close = '\u001b[' + val[1] + 'm';
 	});
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(14)(module)))
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(17)(module)))
 
 /***/ },
-/* 17 */
+/* 20 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(process) {/*
@@ -2051,201 +2389,35 @@
 
 	  return false;
 	})();
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(18)))
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(2)))
 
 /***/ },
-/* 18 */
-/***/ function(module, exports) {
-
-	// shim for using process in browser
-	var process = module.exports = {};
-
-	// cached from whatever global is present so that test runners that stub it
-	// don't break things.  But we need to wrap it in a try catch in case it is
-	// wrapped in strict mode code which doesn't define any globals.  It's inside a
-	// function because try/catches deoptimize in certain engines.
-
-	var cachedSetTimeout;
-	var cachedClearTimeout;
-
-	(function () {
-	    try {
-	        cachedSetTimeout = setTimeout;
-	    } catch (e) {
-	        cachedSetTimeout = function () {
-	            throw new Error('setTimeout is not defined');
-	        }
-	    }
-	    try {
-	        cachedClearTimeout = clearTimeout;
-	    } catch (e) {
-	        cachedClearTimeout = function () {
-	            throw new Error('clearTimeout is not defined');
-	        }
-	    }
-	} ())
-	function runTimeout(fun) {
-	    if (cachedSetTimeout === setTimeout) {
-	        //normal enviroments in sane situations
-	        return setTimeout(fun, 0);
-	    }
-	    try {
-	        // when when somebody has screwed with setTimeout but no I.E. maddness
-	        return cachedSetTimeout(fun, 0);
-	    } catch(e){
-	        try {
-	            // When we are in I.E. but the script has been evaled so I.E. doesn't trust the global object when called normally
-	            return cachedSetTimeout.call(null, fun, 0);
-	        } catch(e){
-	            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error
-	            return cachedSetTimeout.call(this, fun, 0);
-	        }
-	    }
-
-
-	}
-	function runClearTimeout(marker) {
-	    if (cachedClearTimeout === clearTimeout) {
-	        //normal enviroments in sane situations
-	        return clearTimeout(marker);
-	    }
-	    try {
-	        // when when somebody has screwed with setTimeout but no I.E. maddness
-	        return cachedClearTimeout(marker);
-	    } catch (e){
-	        try {
-	            // When we are in I.E. but the script has been evaled so I.E. doesn't  trust the global object when called normally
-	            return cachedClearTimeout.call(null, marker);
-	        } catch (e){
-	            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error.
-	            // Some versions of I.E. have different rules for clearTimeout vs setTimeout
-	            return cachedClearTimeout.call(this, marker);
-	        }
-	    }
-
-
-
-	}
-	var queue = [];
-	var draining = false;
-	var currentQueue;
-	var queueIndex = -1;
-
-	function cleanUpNextTick() {
-	    if (!draining || !currentQueue) {
-	        return;
-	    }
-	    draining = false;
-	    if (currentQueue.length) {
-	        queue = currentQueue.concat(queue);
-	    } else {
-	        queueIndex = -1;
-	    }
-	    if (queue.length) {
-	        drainQueue();
-	    }
-	}
-
-	function drainQueue() {
-	    if (draining) {
-	        return;
-	    }
-	    var timeout = runTimeout(cleanUpNextTick);
-	    draining = true;
-
-	    var len = queue.length;
-	    while(len) {
-	        currentQueue = queue;
-	        queue = [];
-	        while (++queueIndex < len) {
-	            if (currentQueue) {
-	                currentQueue[queueIndex].run();
-	            }
-	        }
-	        queueIndex = -1;
-	        len = queue.length;
-	    }
-	    currentQueue = null;
-	    draining = false;
-	    runClearTimeout(timeout);
-	}
-
-	process.nextTick = function (fun) {
-	    var args = new Array(arguments.length - 1);
-	    if (arguments.length > 1) {
-	        for (var i = 1; i < arguments.length; i++) {
-	            args[i - 1] = arguments[i];
-	        }
-	    }
-	    queue.push(new Item(fun, args));
-	    if (queue.length === 1 && !draining) {
-	        runTimeout(drainQueue);
-	    }
-	};
-
-	// v8 likes predictible objects
-	function Item(fun, array) {
-	    this.fun = fun;
-	    this.array = array;
-	}
-	Item.prototype.run = function () {
-	    this.fun.apply(null, this.array);
-	};
-	process.title = 'browser';
-	process.browser = true;
-	process.env = {};
-	process.argv = [];
-	process.version = ''; // empty string to avoid regexp issues
-	process.versions = {};
-
-	function noop() {}
-
-	process.on = noop;
-	process.addListener = noop;
-	process.once = noop;
-	process.off = noop;
-	process.removeListener = noop;
-	process.removeAllListeners = noop;
-	process.emit = noop;
-
-	process.binding = function (name) {
-	    throw new Error('process.binding is not supported');
-	};
-
-	process.cwd = function () { return '/' };
-	process.chdir = function (dir) {
-	    throw new Error('process.chdir is not supported');
-	};
-	process.umask = function() { return 0; };
-
-
-/***/ },
-/* 19 */
+/* 21 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var map = {
-		"./colors": 15,
-		"./colors.js": 15,
-		"./custom/trap": 20,
-		"./custom/trap.js": 20,
-		"./custom/zalgo": 21,
-		"./custom/zalgo.js": 21,
-		"./extendStringPrototype": 22,
-		"./extendStringPrototype.js": 22,
-		"./index": 13,
-		"./index.js": 13,
-		"./maps/america": 23,
-		"./maps/america.js": 23,
-		"./maps/rainbow": 24,
-		"./maps/rainbow.js": 24,
-		"./maps/random": 25,
-		"./maps/random.js": 25,
-		"./maps/zebra": 26,
-		"./maps/zebra.js": 26,
-		"./styles": 16,
-		"./styles.js": 16,
-		"./system/supports-colors": 17,
-		"./system/supports-colors.js": 17
+		"./colors": 18,
+		"./colors.js": 18,
+		"./custom/trap": 22,
+		"./custom/trap.js": 22,
+		"./custom/zalgo": 23,
+		"./custom/zalgo.js": 23,
+		"./extendStringPrototype": 24,
+		"./extendStringPrototype.js": 24,
+		"./index": 16,
+		"./index.js": 16,
+		"./maps/america": 25,
+		"./maps/america.js": 25,
+		"./maps/rainbow": 26,
+		"./maps/rainbow.js": 26,
+		"./maps/random": 27,
+		"./maps/random.js": 27,
+		"./maps/zebra": 28,
+		"./maps/zebra.js": 28,
+		"./styles": 19,
+		"./styles.js": 19,
+		"./system/supports-colors": 20,
+		"./system/supports-colors.js": 20
 	};
 	function webpackContext(req) {
 		return __webpack_require__(webpackContextResolve(req));
@@ -2258,11 +2430,11 @@
 	};
 	webpackContext.resolve = webpackContextResolve;
 	module.exports = webpackContext;
-	webpackContext.id = 19;
+	webpackContext.id = 21;
 
 
 /***/ },
-/* 20 */
+/* 22 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(module) {module['exports'] = function runTheTrap (text, options) {
@@ -2311,10 +2483,10 @@
 
 	}
 
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(14)(module)))
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(17)(module)))
 
 /***/ },
-/* 21 */
+/* 23 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(module) {// please no
@@ -2422,13 +2594,13 @@
 	  return heComes(text, options);
 	}
 
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(14)(module)))
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(17)(module)))
 
 /***/ },
-/* 22 */
+/* 24 */
 /***/ function(module, exports, __webpack_require__) {
 
-	/* WEBPACK VAR INJECTION */(function(module) {var colors = __webpack_require__(15);
+	/* WEBPACK VAR INJECTION */(function(module) {var colors = __webpack_require__(18);
 
 	module['exports'] = function () {
 
@@ -2528,7 +2700,7 @@
 	  colors.setTheme = function (theme) {
 	    if (typeof theme === 'string') {
 	      try {
-	        colors.themes[theme] = __webpack_require__(19)(theme);
+	        colors.themes[theme] = __webpack_require__(21)(theme);
 	        applyTheme(colors.themes[theme]);
 	        return colors.themes[theme];
 	      } catch (err) {
@@ -2541,13 +2713,13 @@
 	  };
 
 	};
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(14)(module)))
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(17)(module)))
 
 /***/ },
-/* 23 */
+/* 25 */
 /***/ function(module, exports, __webpack_require__) {
 
-	/* WEBPACK VAR INJECTION */(function(module) {var colors = __webpack_require__(15);
+	/* WEBPACK VAR INJECTION */(function(module) {var colors = __webpack_require__(18);
 
 	module['exports'] = (function() {
 	  return function (letter, i, exploded) {
@@ -2559,13 +2731,13 @@
 	    }
 	  }
 	})();
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(14)(module)))
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(17)(module)))
 
 /***/ },
-/* 24 */
+/* 26 */
 /***/ function(module, exports, __webpack_require__) {
 
-	/* WEBPACK VAR INJECTION */(function(module) {var colors = __webpack_require__(15);
+	/* WEBPACK VAR INJECTION */(function(module) {var colors = __webpack_require__(18);
 
 	module['exports'] = (function () {
 	  var rainbowColors = ['red', 'yellow', 'green', 'blue', 'magenta']; //RoY G BiV
@@ -2579,13 +2751,13 @@
 	})();
 
 
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(14)(module)))
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(17)(module)))
 
 /***/ },
-/* 25 */
+/* 27 */
 /***/ function(module, exports, __webpack_require__) {
 
-	/* WEBPACK VAR INJECTION */(function(module) {var colors = __webpack_require__(15);
+	/* WEBPACK VAR INJECTION */(function(module) {var colors = __webpack_require__(18);
 
 	module['exports'] = (function () {
 	  var available = ['underline', 'inverse', 'grey', 'yellow', 'red', 'green', 'blue', 'white', 'cyan', 'magenta'];
@@ -2593,29 +2765,29 @@
 	    return letter === " " ? letter : colors[available[Math.round(Math.random() * (available.length - 1))]](letter);
 	  };
 	})();
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(14)(module)))
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(17)(module)))
 
 /***/ },
-/* 26 */
+/* 28 */
 /***/ function(module, exports, __webpack_require__) {
 
-	/* WEBPACK VAR INJECTION */(function(module) {var colors = __webpack_require__(15);
+	/* WEBPACK VAR INJECTION */(function(module) {var colors = __webpack_require__(18);
 
 	module['exports'] = function (letter, i, exploded) {
 	  return i % 2 === 0 ? letter : colors.inverse(letter);
 	};
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(14)(module)))
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(17)(module)))
 
 /***/ },
-/* 27 */
+/* 29 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// var network = require('../network.js')
-	var Window = __webpack_require__(28)
-	var Experience = __webpack_require__(29)
-	var Buffers = __webpack_require__(30)
-	var DQN = __webpack_require__(31)
-	var DDPG = __webpack_require__(32)
+	var Window = __webpack_require__(30)
+	var Experience = __webpack_require__(31)
+	var Buffers = __webpack_require__(32)
+	var DQN = __webpack_require__(33)
+	var DDPG = __webpack_require__(35)
 
 	/**
 	 * The Agent class represents the
@@ -2639,7 +2811,7 @@
 				algorithm: 'ddpg',
 
 				discount: opt.discount || 0.95,
-				beta: 0.5, // how to prioritise experiences (0 = no prioritisation, 1 = full prioritisation)
+				beta: 0.15, // how to prioritise experiences (0 = no prioritisation, 1 = full prioritisation)
 
 			}, opt)
 
@@ -2692,13 +2864,15 @@
 		}
 
 		actionToVector(action) {
-			if (action instanceof Float64Array)
+			if (action instanceof Float64Array) {
 				return action
+			}
 
-			if (Number.isInteger(action))
+			if (Number.isInteger(action)) {
 				return Float64Array.oneHot(action, this.actions)
+			}
 
-			throw 'action invalid'
+			throw 'Action is invalid'
 		}
 
 		getStateInputVector(state) {
@@ -2747,7 +2921,7 @@
 		 */
 		learn(reward) {
 			if (!this.acted || !this.ready)
-				return 
+				return
 
 			this.acted = false
 			this.history.rewards.push(reward)
@@ -2771,15 +2945,15 @@
 			// Get older
 			++this.age 
 
-			if (this.pool)
-				return 0.0
-
 			return this.backward()
 		}
 
 		backward() {
 			if (this.options.startLearningAt > this.age)
 				return false
+
+			// Set training
+			this.training = true
 
 			// Learn batch
 			var loss = this.replay()
@@ -2813,7 +2987,7 @@
 		}
 
 		evaluate(state, target) {
-			return this.value(state, this.act(state, target), target)
+			return this.algorithm.evaluate(state, target)
 		}
 
 
@@ -2821,10 +2995,6 @@
 		// utility functions
 		export() {
 			return this.algorithm.export()
-		}
-
-		import(params) {
-			return this.algorithm.import(params)
 		}
 
 		static getInputDimension(states, actions, temporalWindow) {
@@ -2836,7 +3006,7 @@
 	module.exports = Agent
 
 /***/ },
-/* 28 */
+/* 30 */
 /***/ function(module, exports) {
 
 	class Window {
@@ -2867,7 +3037,7 @@
 	module.exports = Window
 
 /***/ },
-/* 29 */
+/* 31 */
 /***/ function(module, exports) {
 
 	class Experience {
@@ -2920,7 +3090,7 @@
 	module.exports = Experience
 
 /***/ },
-/* 30 */
+/* 32 */
 /***/ function(module, exports) {
 
 	class ReplayBuffer {
@@ -2999,9 +3169,16 @@
 		}
 
 		add(e) {
-			this.leafs[this.iterations % this.leafs.length].set(e)
-			this.size = Math.max(this.size, this.iterations % this.leafs.length + 1)
+			if (this.size === this.leafs.length) {
+				this.root.descent((a, b) => a.minimum < b.minimum ? 0 : 1).set(e)
+			}
+
+			else {
+				this.leafs[this.size].set(e)
+			}
+			
 			this.iterations += 1
+			this.size = Math.max(this.size, this.iterations % this.leafs.length)
 		}
 
 		sample(n) { 
@@ -3090,7 +3267,7 @@
 			if (!this.experience)
 				return 
 
-			this.value = this.experience.priority || 0.0
+			this.value = this.experience.priority || Infinity
 
 			this.maximum = this.value
 			this.minimum = this.value
@@ -3153,12 +3330,12 @@
 	}
 
 /***/ },
-/* 31 */
-/***/ function(module, exports) {
+/* 33 */
+/***/ function(module, exports, __webpack_require__) {
 
-	
+	var Algorithm = __webpack_require__(34)
 
-	class DQN {
+	class DQN extends Algorithm {
 
 		constructor(agent) {
 			// options
@@ -3283,63 +3460,110 @@
 	module.exports = DQN;
 
 /***/ },
-/* 32 */
+/* 34 */
 /***/ function(module, exports) {
 
 	
-	class DDPG {
+	class Algorithm {
+
+		// what to do?
+		act(state, target) { throw 'Not implemented' }
+
+		// how good is an action at state
+		value(state, action, target) { throw 'Not implemented' }
+
+		// replay
+		optimize(e, descent = true) { throw 'Not implemented' }
+
+		// adjust weights etc
+		learn() { throw 'Not implemented' }
+
+		import(params) { throw 'Not implemented' }
+		export() { throw 'Not implemented' }
+
+
+		evaluate(state, target) {
+			return this.value(state, this.act(state, target), target)
+		}
+
+	}
+
+	module.exports = Algorithm
+
+/***/ },
+/* 35 */
+/***/ function(module, exports, __webpack_require__) {
+
+	var network = __webpack_require__(4)
+	var shared = __webpack_require__(15)
+
+	var NetOnDisk = __webpack_require__(36)
+	var Algorithm = __webpack_require__(34)
+
+
+	/* Deep deterministic policy gradient */
+	class DDPG extends Algorithm {
 
 		constructor(agent) {
+			super()
 			// options
 			this.options = Object.assign({
-
-				alpha: 0.1, // advantage learning (AL) http://arxiv.org/pdf/1512.04860v1.pdf; increase action-gap
+				alpha: 0, // advantage learning (AL) http://arxiv.org/pdf/1512.04860v1.pdf; increase action-gap
 				theta: 0.001, // soft target updates
-
 			}, agent.options)
 
-			// networks
-			this.actor = agent.options.actor.newState()
-			this.critic = agent.options.critic.newState()
+
+			this.actor = new shared.NetworkWrapper()
+			this.critic = new shared.NetworkWrapper()
 
 			// target networks
-			if (agent.options.targetActor) {
-				if (agent.options.targetActor.model !== this.actor.model)
-					throw 'Target actor model not right';
 
-				this.targetActor = agent.options.targetActor.newState()
-			}
+			var targetCreate = (wrapper, state) => {
+				wrapper.live = state
 
-			else {
-				this.targetActor = this.actor.model.newState() // agent.options.target.actor.newState()
-			}
+				if (this.options.theta < 1) {
+					wrapper.target = wrapper.live.model.newState()
+				}
 				
-			if (agent.options.targetCritic) {
-				if (agent.options.targetCritic.model !== this.critic.model)
-					throw 'Target critic model not right';
-
-				this.targetCritic = agent.options.targetCritic.newState()
+				else {
+					wrapper.target = wrapper.live
+				}
 			}
 
-			else {
-				this.targetCritic = this.critic.model.newState() // agent.options.target.actor.newState()
-			}
-				
-			this.targetActor.configuration.copyParametersFrom(this.actor.configuration)
-			this.targetCritic.configuration.copyParametersFrom(this.critic.configuration)
+			this.actor.on('set', targetCreate)
+			this.critic.on('set', targetCreate)
 
-			// network weight updates
-			this.targetActorUpdate = this.progressiveCopy.bind(this, this.actor.configuration)
-			this.targetCriticUpdate = this.progressiveCopy.bind(this, this.critic.configuration)
+			// network validations
 
-			// optimizer
-			this.actor.configuration.useOptimizer({
-				type: 'ascent',
-				method: 'adadelta',
-				regularization: { l2: 1e-3 }
+			this.actor.on('set', (wrapper, state) => {
+				if (state.in.w.length !== this.agent.input) {
+					throw 'actor input length insufficient'
+				}
+
+				if (state.out.w.length !== this.agent.actions) {
+					throw 'actor output insufficient'
+				}
 			})
 
-			this.critic.configuration.useOptimizer({
+			this.critic.on('set', (wrapper, state) => {
+				if (state.in.w.length !== this.agent.input + this.agent.actions) {
+					throw 'critic input length insufficient'
+				}
+
+				if (state.out.w.length !== 1) {
+					throw 'critic output length insufficient'
+				}
+			})
+
+			// optimizer
+
+			this.actor.useOptimizer({
+				type: 'ascent',
+				method: 'adadelta',
+				regularization: { l2: 1e-2 }
+			})
+
+			this.critic.useOptimizer({
 				type: 'descent',
 				method: 'adadelta',
 	            regularization: { l2: 1e-3 }
@@ -3347,34 +3571,34 @@
 
 			// agent
 			this.agent = agent
+
+			this.input = agent.input
 			this.buffer = agent.buffer
 
-			this.states = this.agent.states
-			this.actions = this.agent.actions
-			this.input = this.agent.input
+			// network weight updates
+			this.targetActorUpdate = this.progressiveCopy.bind(this, this.actor)
+			this.targetCriticUpdate = this.progressiveCopy.bind(this, this.critic)
 
-			if (this.actor.in.w.length !== this.agent.input)
-				throw 'actor input length insufficient'
-
-			if (this.critic.in.w.length !== this.agent.input + this.agent.actions)
-				throw 'critic input length insufficient'
+			// adopt networks
+			this.actor.set(this.options.actor)
+			this.critic.set(this.options.critic)
 		}
 
 		act(state, target) {
 			if (target) {
-				return this.targetActor.forward(state)
+				return this.actor.target.forward(state)
 			}
 
-			return this.actor.forward(state)
+			return this.actor.live.forward(state)
 		}
 
 		value(state, action, target) {
-			target = target ? this.targetCritic : this.critic
+			var net = target ? this.critic.target : this.critic.live
 
-			target.in.w.set(state, 0)
-			target.in.w.set(action, this.input)
+			net.in.w.set(state, 0)
+			net.in.w.set(action, this.input)
 
-			return target.forward()[0]
+			return net.forward()[0]
 		}
 
 		optimize(e, descent = true) {
@@ -3385,24 +3609,13 @@
 			var gradAL = grad
 
 			if (this.options.alpha > 0) {
-				gradAL = grad + this.options.alpha * (value - this.agent.evaluate(e.state0, true)) // advantage learning
-			}
-
-			if (isNaN(gradAL)) {
-				console.log(target)
-				console.log(value)
-				console.log(grad)
-				console.log(gradAL)
-
-				throw 'NaN'
-
-				return 0.0
+				gradAL = grad + this.options.alpha * (value - this.evaluate(e.state0, true)) // advantage learning
 			}
 
 			if (descent) {
 				var isw = this.buffer.getImportanceSamplingWeight(e)
-				this.critic.backwardWithGradient(gradAL * isw)
-				this.critic.configuration.accumulate()
+				this.critic.live.backwardWithGradient(gradAL * isw)
+				this.critic.live.configuration.accumulate()
 				this.teach(e, isw)
 			}
 
@@ -3410,71 +3623,66 @@
 		}
 
 		teach(e, isw = 1.0, descent = true) {
-			var action = this.actor.forward(e.state0)  // which action to take?
+			var action = this.actor.live.forward(e.state0)  // which action to take?
 			var val = this.value(e.state0, action) // how good will the future be, if i take this action?
-			var grad = this.critic.derivatives(0, false) // how will the future change, if i change this action
+			var grad = this.critic.live.derivatives(0, false) // how will the future change, if i change this action
 
 			for (var i = 0; i < this.options.actions; i++) {
-				this.actor.out.dw[i] = grad[this.input + i] * isw
+				this.actor.live.out.dw[i] = grad[this.input + i] * isw
 			}
 
 			if (descent) {
-				this.actor.backward() // propagate change
-				this.actor.configuration.accumulate()
+				this.actor.live.backward() // propagate change
+				this.actor.config.accumulate()
 			}
 		}
 
 		learn() {
 			// Improve through batch accumuluated gradients
-			this.actor.configuration.optimize(false)
-			this.critic.configuration.optimize(false)
+			if (!this.actor.optimizedCentrally) {
+				this.actor.config.optimize(false)
+			}	
+
+			if (!this.critic.optimizedCentrally) {
+				this.critic.config.optimize(false)
+			}
+			
 
 			// Copy actor and critic to target networks slowly
 			this.targetNetworkUpdates()
 		}
 
 		targetNetworkUpdates() {
-			this.targetActor.configuration.forEachParameter(this.targetActorUpdate)
-			this.targetCritic.configuration.forEachParameter(this.targetCriticUpdate)
+			this.actor.target.configuration.forEachParameter(this.targetActorUpdate)
+			this.critic.target.configuration.forEachParameter(this.targetCriticUpdate)
 		}
 
 		progressiveCopy(net, param, index) {
-			var _theta = this.options.theta
+			if (this.options.theta >= 1) {
+				return 
+			}
+
+			// _ = network in use, no _ = target network
+			var _theta = this.options.theta, _paramw = net.config.parameters[index].w
+			var  theta = 1.0 - _theta,        paramw = param.w
+
 			for (var i = 0; i < param.w.length; i++) {
-				param.w[i] = _theta * net.parameters[index].w[i] + (1.0 - _theta) * param.w[i]
+				paramw[i] = _theta * _paramw[i] + theta * paramw[i]
 			}
 		}
 
 
-		import(params) {
-			var a_count = this.actor.configuration.countOfParameters
-			var c_count = this.critic.configuration.countOfParameters
-
-			if (params.length !== a_count + c_count)
-				return false;
-
-			var actor = params.subarray(0, a_count)
-			var critic = params.subarray(a_count, a_count + c_count)
-
-			this.actor.configuration.read(actor)
-			this.critic.configuration.read(critic)
-
-			this.targetActor.configuration.read(actor)
-			this.targetCritic.configuration.read(critic)
-
-			return true;
+		import(file) {
+			var multiPart = NetOnDisk.readMultiPart(file)
+			this.actor.set(multiPart.actor)
+			this.critic.set(multiPart.critic)
 		}
 
 		export() {
-			var a_count = this.actor.configuration.countOfParameters
-			var c_count = this.critic.configuration.countOfParameters
-
-			var params = new Float64Array(a_count + c_count)
-
-			params.set(this.actor.configuration.write(), 0)
-			params.set(this.critic.configuration.write(), a_count)
-
-			return params
+			return NetOnDisk.writeMultiPart({
+				'actor': this.actor.config,
+				'critic': this.critic.config
+			})
 		}
 
 	}
@@ -3482,7 +3690,1008 @@
 	module.exports = DDPG;
 
 /***/ },
-/* 33 */
+/* 36 */
+/***/ function(module, exports, __webpack_require__) {
+
+	var binary = __webpack_require__(37);
+	var network = __webpack_require__(4);
+
+	class NetOnDisk {
+
+		static write(config) {
+			var contents = [];
+
+			contents.push(config.model.representation)
+			contents.push(config.pullWeights())
+
+			return binary.Writer.write(contents)
+		}
+
+		static read(buffer) {
+			var contents = binary.Reader.read(buffer)
+
+			var model = new network.Model(contents[0])
+			var config = model.newConfiguration()
+
+			config.putWeights(contents[1])
+
+			return config
+		}
+
+
+
+		static writeMultiPart(list) {
+			var contents = [];
+
+			contents.push(Object.keys(list))
+
+			for (var name in list) {
+				var config = list[name]
+
+				if (!config instanceof network.Configuration) {
+					throw 'config in list must be of type Network.Configuration'
+				}
+
+				contents.push(name)
+				contents.push(config.model.representation)
+				contents.push(config.pullWeights())
+			}
+
+			return binary.Writer.write(contents)
+		}
+
+		static readMultiPart(buffer) {
+			var contents = binary.Reader.read(buffer)
+
+			var ptr = -1
+			var names = contents[++ptr]
+
+			var list = {}
+
+			for (var i = 0; i < names.length; i++) {
+				var name = names[i]
+
+				if (contents[++ptr] !== name) {
+					throw 'name does not match up'
+				}
+
+				var model = new network.Model(contents[++ptr])
+				var config = model.newConfiguration()
+
+				config.putWeights(contents[++ptr])
+
+				list[name] = config
+			}
+
+			return list
+		}
+
+	}
+
+	module.exports = NetOnDisk
+
+/***/ },
+/* 37 */
+/***/ function(module, exports, __webpack_require__) {
+
+	/* WEBPACK VAR INJECTION */(function(global) {var StringView = __webpack_require__(38);
+
+	function isObjLiteral(_obj) {
+	  var _test  = _obj;
+	  return (  typeof _obj !== 'object' || _obj === null ?
+	              false :  
+	              (
+	                (function () {
+	                  while (!false) {
+	                    if (  Object.getPrototypeOf( _test = Object.getPrototypeOf(_test)  ) === null) {
+	                      break;
+	                    }      
+	                  }
+	                  return Object.getPrototypeOf(_obj) === _test;
+	                })()
+	              )
+	          );
+	}
+
+	class BinaryWriter {
+
+		/**
+		 * Returns array buffer, which contains the binary data.
+		 * @param  {array} contents
+		 * @return {ArrayBuffer} 
+		 */
+		static write(contents) {
+			var toc = [], length = 0;
+
+			for (var i = 0; i < contents.length; i++) {
+				var value = contents[i]
+				var isobject = false
+
+				if (value.constructor === Object || value.constructor === Array) {
+					value = (contents[i] = JSON.stringify(value))
+					isobject = true
+				}
+
+				if (typeof value === 'string') {
+					toc.push({
+						t: 's',
+						l: value.length
+					});
+
+					if (isobject) {
+						toc[toc.length - 1]['o'] = 1;
+					}
+
+					length += value.length
+				}
+
+				else if (ArrayBuffer.isView(value)) {
+					toc.push({
+						t: 't',
+						l: value.byteLength,
+						i: value.constructor.name
+					})
+
+					length += value.byteLength
+				}
+
+				else if (value instanceof ArrayBuffer) {
+					toc.push({
+						t: 'b',
+						l: value.byteLength
+					})
+
+					length += value.byteLength
+				}
+	 		}
+
+			var jsonified = JSON.stringify(toc)
+
+			length += jsonified.length + Uint32Array.BYTES_PER_ELEMENT + 1
+
+			var writer = new BinaryWriter(length)
+
+			writer.setUint8(BinaryWriter.validationByte) // validation byte
+			writer.setUint32(jsonified.length) // table of contents length
+			writer.setString(jsonified) // ToC
+
+			for (var i = 0; i < toc.length; i++) {
+				switch(toc[i].t) {
+					case 's': writer.setString(contents[i]); break
+					case 't': writer.setTypedArray(contents[i]); break
+					case 'b': writer.setBuffer(contents[i]); break
+				}
+			}
+
+			if (!writer.isAtEnd()) {
+				throw "The lengths don't match up";
+			}
+
+			return writer.raw
+		}
+
+
+		constructor(length) {
+			this.array = new Uint8Array(length)
+			this.buffer = this.array.buffer
+			this.dataView = new DataView(this.buffer)
+			this.index = 0
+		}
+
+		setUint8(val) {
+			this.dataView.setUint8(this.index, val)
+			this.index += Uint8Array.BYTES_PER_ELEMENT
+		}
+
+		setUint32(val) {
+			this.dataView.setUint32(this.index, val)
+			this.index += Uint32Array.BYTES_PER_ELEMENT
+		}
+
+		setString(string) {
+			var sv = new StringView(string);
+			this.array.set(sv.rawData, this.index);
+			this.index += sv.buffer.byteLength
+		}
+
+		setTypedArray(arr) {
+			this.array.set(new Uint8Array(arr.buffer), this.index)
+			this.index += arr.byteLength
+		}
+
+		setBuffer(buf) {
+			this.array.set(new Uint8Array(buf), this.index)
+			this.index += buf.byteLength
+		}
+
+		isAtEnd() {
+			return this.buffer.byteLength === this.index
+		}
+
+		get raw() {
+			return this.array.buffer
+		}
+
+	}
+
+
+	class BinaryReader {
+
+		/**
+		 * Returns the contents read from the array buffer
+		 * @param  {ArrayBuffer} buffer
+		 * @return {array}      
+		 */
+		static read(buffer) {
+			var reader = new BinaryReader(buffer)
+
+			var validation = reader.getUint8()
+
+			if (validation !== BinaryWriter.validationByte) {
+				throw "validation byte doesn't match."
+			}
+
+			var tocLength = reader.getUint32()
+			var tocString = reader.getString(tocLength)
+			var toc = JSON.parse(tocString)
+			var contents = []
+
+			for (var i = 0; i < toc.length; i++) {
+				switch (toc[i].t) {
+					case 's': contents.push(reader.getString(toc[i].l)); break
+					case 't': contents.push(new (typeof window !== 'undefined' ? window : global)[toc[i].i](reader.getBuffer(toc[i].l))); break
+					case 'b': contents.push(reader.getBuffer(toc[i].l)); break
+				}
+
+				if (toc[i]['o'] === 1) {
+					contents[i] = JSON.parse(contents[i]);
+				}
+			}
+
+			return contents
+		}
+
+
+		constructor(buffer) {
+			this.array = new Uint8Array(buffer)
+			this.buffer = buffer
+			this.dataView = new DataView(buffer)
+			this.index = 0
+		}
+
+
+		getUint8() {
+			var val = this.dataView.getUint8(this.index)
+			this.index += Uint8Array.BYTES_PER_ELEMENT
+
+			return val
+		}
+
+		getUint32() {
+			var val = this.dataView.getUint32(this.index)
+			this.index += Uint32Array.BYTES_PER_ELEMENT
+
+			return val
+		}
+
+		getString(length) {
+			var arr = this.array.subarray(this.index, this.index + length)
+			var str = (new StringView(arr)).toString()
+
+			this.index += arr.byteLength
+
+			return str
+		}
+
+		getBuffer(byteLength) {
+			var arr = this.array.slice(this.index, this.index + byteLength)
+			this.index += byteLength
+
+			return arr.buffer
+		}
+
+		isAtEnd() {
+			return this.buffer.byteLength === this.index
+		}
+
+	}
+
+	BinaryWriter.validationByte = 0x8F;
+
+	module.exports = {
+		'Writer' : BinaryWriter,
+		'Reader' : BinaryReader
+	};
+	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }())))
+
+/***/ },
+/* 38 */
+/***/ function(module, exports) {
+
+	"use strict";
+
+	/*\
+	|*|
+	|*|	:: Number.isInteger() polyfill ::
+	|*|
+	|*|	https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Number/isInteger
+	|*|
+	\*/
+
+	if (!Number.isInteger) {
+		Number.isInteger = function isInteger (nVal) {
+			return typeof nVal === "number" && isFinite(nVal) && nVal > -9007199254740992 && nVal < 9007199254740992 && Math.floor(nVal) === nVal;
+		};
+	}
+
+	/*\
+	|*|
+	|*|	StringView - Mozilla Developer Network
+	|*|
+	|*|	Revision #9, October 30, 2016
+	|*|
+	|*|	https://developer.mozilla.org/en-US/Add-ons/Code_snippets/StringView
+	|*|	https://developer.mozilla.org/en-US/docs/User:fusionchess
+	|*|	https://github.com/madmurphy/stringview.js
+	|*|
+	|*|	This framework is released under the GNU Lesser General Public License, version 3 or later.
+	|*|	http://www.gnu.org/licenses/lgpl-3.0.html
+	|*|
+	\*/
+
+	function StringView (vInput, sEncoding /* optional (default: UTF-8) */, nOffset /* optional */, nLength /* optional */) {
+
+		var fTAView, aWhole, aRaw, fPutOutptCode, fGetOutptChrSize, nInptLen, nStartIdx = isFinite(nOffset) ? nOffset : 0, nTranscrType = 15;
+
+		if (sEncoding) { this.encoding = sEncoding.toString(); }
+
+		encSwitch: switch (this.encoding) {
+			case "UTF-8":
+				fPutOutptCode = StringView.putUTF8CharCode;
+				fGetOutptChrSize = StringView.getUTF8CharLength;
+				fTAView = Uint8Array;
+				break encSwitch;
+			case "UTF-16":
+				fPutOutptCode = StringView.putUTF16CharCode;
+				fGetOutptChrSize = StringView.getUTF16CharLength;
+				fTAView = Uint16Array;
+				break encSwitch;
+			case "UTF-32":
+				fTAView = Uint32Array;
+				nTranscrType &= 14;
+				break encSwitch;
+			default:
+				/* case "ASCII", or case "BinaryString" or unknown cases */
+				fTAView = Uint8Array;
+				nTranscrType &= 14;
+		}
+
+		typeSwitch: switch (typeof vInput) {
+			case "string":
+				/* the input argument is a primitive string: a new buffer will be created. */
+				nTranscrType &= 7;
+				break typeSwitch;
+			case "object":
+				classSwitch: switch (vInput.constructor) {
+					case StringView:
+						/* the input argument is a stringView: a new buffer will be created. */
+						nTranscrType &= 3;
+						break typeSwitch;
+					case String:
+						/* the input argument is an objectified string: a new buffer will be created. */
+						nTranscrType &= 7;
+						break typeSwitch;
+					case ArrayBuffer:
+						/* the input argument is an arrayBuffer: the buffer will be shared. */
+						aWhole = new fTAView(vInput);
+						nInptLen = this.encoding === "UTF-32" ?
+								vInput.byteLength >>> 2
+							: this.encoding === "UTF-16" ?
+								vInput.byteLength >>> 1
+							:
+								vInput.byteLength;
+						aRaw = nStartIdx === 0 && (!isFinite(nLength) || nLength === nInptLen) ?
+							aWhole
+							: new fTAView(vInput, nStartIdx, !isFinite(nLength) ? nInptLen - nStartIdx : nLength);
+
+						break typeSwitch;
+					case Uint32Array:
+					case Uint16Array:
+					case Uint8Array:
+						/* the input argument is a typedArray: the buffer, and possibly the array itself, will be shared. */
+						fTAView = vInput.constructor;
+						nInptLen = vInput.length;
+						aWhole = vInput.byteOffset === 0 && vInput.length === (
+							fTAView === Uint32Array ?
+								vInput.buffer.byteLength >>> 2
+							: fTAView === Uint16Array ?
+								vInput.buffer.byteLength >>> 1
+							:
+								vInput.buffer.byteLength
+						) ? vInput : new fTAView(vInput.buffer);
+						aRaw = nStartIdx === 0 && (!isFinite(nLength) || nLength === nInptLen) ?
+							vInput
+							: vInput.subarray(nStartIdx, isFinite(nLength) ? nStartIdx + nLength : nInptLen);
+
+						break typeSwitch;
+					default:
+						/* the input argument is an array or another serializable object: a new typedArray will be created. */
+						aWhole = new fTAView(vInput);
+						nInptLen = aWhole.length;
+						aRaw = nStartIdx === 0 && (!isFinite(nLength) || nLength === nInptLen) ?
+							aWhole
+							: aWhole.subarray(nStartIdx, isFinite(nLength) ? nStartIdx + nLength : nInptLen);
+				}
+				break typeSwitch;
+			default:
+				/* the input argument is a number, a boolean or a function: a new typedArray will be created. */
+				aWhole = aRaw = new fTAView(Number(vInput) || 0);
+
+		}
+
+		if (nTranscrType < 8) {
+
+			var vSource, nOutptLen, nCharStart, nCharEnd, nEndIdx, fGetInptChrSize, fGetInptChrCode;
+
+			if (nTranscrType & 4) { /* input is string */
+
+				vSource = vInput;
+				nOutptLen = nInptLen = vSource.length;
+				nTranscrType ^= this.encoding === "UTF-32" ? 0 : 2;
+				/* ...or...: nTranscrType ^= Number(this.encoding !== "UTF-32") << 1; */
+				nStartIdx = nCharStart = nOffset ? Math.max((nOutptLen + nOffset) % nOutptLen, 0) : 0;
+				nEndIdx = nCharEnd = (Number.isInteger(nLength) ? Math.min(Math.max(nLength, 0) + nStartIdx, nOutptLen) : nOutptLen) - 1;
+
+			} else { /* input is stringView */
+
+				vSource = vInput.rawData;
+				nInptLen = vInput.makeIndex();
+				nStartIdx = nCharStart = nOffset ? Math.max((nInptLen + nOffset) % nInptLen, 0) : 0;
+				nOutptLen = Number.isInteger(nLength) ? Math.min(Math.max(nLength, 0), nInptLen - nCharStart) : nInptLen;
+				nEndIdx = nCharEnd = nOutptLen + nCharStart;
+
+				if (vInput.encoding === "UTF-8") {
+					fGetInptChrSize = StringView.getUTF8CharLength;
+					fGetInptChrCode = StringView.loadUTF8CharCode;
+				} else if (vInput.encoding === "UTF-16") {
+					fGetInptChrSize = StringView.getUTF16CharLength;
+					fGetInptChrCode = StringView.loadUTF16CharCode;
+				} else {
+					nTranscrType &= 1;
+				}
+
+			}
+
+			if (nOutptLen === 0 || nTranscrType < 4 && vSource.encoding === this.encoding && nCharStart === 0 && nOutptLen === nInptLen) {
+
+				/* the encoding is the same, the length too and the offset is 0... or the input is empty! */
+
+				nTranscrType = 7;
+
+			}
+
+			conversionSwitch: switch (nTranscrType) {
+
+				case 0:
+
+				/* both the source and the new StringView have a fixed-length encoding... */
+
+					aWhole = new fTAView(nOutptLen);
+					for (var nOutptIdx = 0; nOutptIdx < nOutptLen; aWhole[nOutptIdx] = vSource[nStartIdx + nOutptIdx++]);
+					break conversionSwitch;
+
+				case 1:
+
+				/* the source has a fixed-length encoding but the new StringView has a variable-length encoding... */
+
+					/* mapping... */
+
+					nOutptLen = 0;
+
+					for (var nInptIdx = nStartIdx; nInptIdx < nEndIdx; nInptIdx++) {
+						nOutptLen += fGetOutptChrSize(vSource[nInptIdx]);
+					}
+
+					aWhole = new fTAView(nOutptLen);
+
+					/* transcription of the source... */
+
+					for (var nInptIdx = nStartIdx, nOutptIdx = 0; nOutptIdx < nOutptLen; nInptIdx++) {
+						nOutptIdx = fPutOutptCode(aWhole, vSource[nInptIdx], nOutptIdx);
+					}
+
+					break conversionSwitch;
+
+				case 2:
+
+				/* the source has a variable-length encoding but the new StringView has a fixed-length encoding... */
+
+					/* mapping... */
+
+					nStartIdx = 0;
+
+					var nChrCode;
+
+					for (nChrIdx = 0; nChrIdx < nCharStart; nChrIdx++) {
+						nChrCode = fGetInptChrCode(vSource, nStartIdx);
+						nStartIdx += fGetInptChrSize(nChrCode);
+					}
+
+					aWhole = new fTAView(nOutptLen);
+
+					/* transcription of the source... */
+
+					for (var nInptIdx = nStartIdx, nOutptIdx = 0; nOutptIdx < nOutptLen; nInptIdx += fGetInptChrSize(nChrCode), nOutptIdx++) {
+						nChrCode = fGetInptChrCode(vSource, nInptIdx);
+						aWhole[nOutptIdx] = nChrCode;
+					}
+
+					break conversionSwitch;
+
+				case 3:
+
+				/* both the source and the new StringView have a variable-length encoding... */
+
+					/* mapping... */
+
+					nOutptLen = 0;
+
+					var nChrCode;
+
+					for (var nChrIdx = 0, nInptIdx = 0; nChrIdx < nCharEnd; nInptIdx += fGetInptChrSize(nChrCode)) {
+						nChrCode = fGetInptChrCode(vSource, nInptIdx);
+						if (nChrIdx === nCharStart) { nStartIdx = nInptIdx; }
+						if (++nChrIdx > nCharStart) { nOutptLen += fGetOutptChrSize(nChrCode); }
+					}
+
+					aWhole = new fTAView(nOutptLen);
+
+					/* transcription... */
+
+					for (var nInptIdx = nStartIdx, nOutptIdx = 0; nOutptIdx < nOutptLen; nInptIdx += fGetInptChrSize(nChrCode)) {
+						nChrCode = fGetInptChrCode(vSource, nInptIdx);
+						nOutptIdx = fPutOutptCode(aWhole, nChrCode, nOutptIdx);
+					}
+
+					break conversionSwitch;
+
+				case 4:
+
+				/* DOMString to ASCII or BinaryString or other unknown encodings */
+
+					aWhole = new fTAView(nOutptLen);
+
+					/* transcription... */
+
+					for (var nIdx = 0; nIdx < nOutptLen; nIdx++) {
+						aWhole[nIdx] = vSource.charCodeAt(nIdx) & 0xff;
+					}
+
+					break conversionSwitch;
+
+				case 5:
+
+				/* DOMString to UTF-8 or to UTF-16 */
+
+					/* mapping... */
+
+					nOutptLen = 0;
+
+					for (var nMapIdx = 0; nMapIdx < nInptLen; nMapIdx++) {
+						if (nMapIdx === nCharStart) { nStartIdx = nOutptLen; }
+						nOutptLen += fGetOutptChrSize(vSource.charCodeAt(nMapIdx));
+						if (nMapIdx === nCharEnd) { nEndIdx = nOutptLen; }
+					}
+
+					aWhole = new fTAView(nOutptLen);
+
+					/* transcription... */
+
+					for (var nOutptIdx = 0, nChrIdx = 0; nOutptIdx < nOutptLen; nChrIdx++) {
+						nOutptIdx = fPutOutptCode(aWhole, vSource.charCodeAt(nChrIdx), nOutptIdx);
+					}
+
+					break conversionSwitch;
+
+				case 6:
+
+				/* DOMString to UTF-32 */
+
+					aWhole = new fTAView(nOutptLen);
+
+					/* transcription... */
+
+					for (var nIdx = 0; nIdx < nOutptLen; nIdx++) {
+						aWhole[nIdx] = vSource.charCodeAt(nIdx);
+					}
+
+					break conversionSwitch;
+
+				case 7:
+
+					aWhole = new fTAView(nOutptLen ? vSource : 0);
+					break conversionSwitch;
+
+			}
+
+			aRaw = nTranscrType > 3 && (nStartIdx > 0 || nEndIdx < aWhole.length - 1) ? aWhole.subarray(nStartIdx, nEndIdx) : aWhole;
+
+		}
+
+		this.buffer = aWhole.buffer;
+		this.bufferView = aWhole;
+		this.rawData = aRaw;
+
+		Object.freeze(this);
+
+	}
+
+	/* CONSTRUCTOR'S METHODS */
+
+	StringView.loadUTF8CharCode = function (aChars, nIdx) {
+
+		var nLen = aChars.length, nPart = aChars[nIdx];
+
+		return nPart > 251 && nPart < 254 && nIdx + 5 < nLen ?
+				/* (nPart - 252 << 30) may be not safe in ECMAScript! So...: */
+				/* six bytes */ (nPart - 252) * 1073741824 + (aChars[nIdx + 1] - 128 << 24) + (aChars[nIdx + 2] - 128 << 18) + (aChars[nIdx + 3] - 128 << 12) + (aChars[nIdx + 4] - 128 << 6) + aChars[nIdx + 5] - 128
+			: nPart > 247 && nPart < 252 && nIdx + 4 < nLen ?
+				/* five bytes */ (nPart - 248 << 24) + (aChars[nIdx + 1] - 128 << 18) + (aChars[nIdx + 2] - 128 << 12) + (aChars[nIdx + 3] - 128 << 6) + aChars[nIdx + 4] - 128
+			: nPart > 239 && nPart < 248 && nIdx + 3 < nLen ?
+				/* four bytes */(nPart - 240 << 18) + (aChars[nIdx + 1] - 128 << 12) + (aChars[nIdx + 2] - 128 << 6) + aChars[nIdx + 3] - 128
+			: nPart > 223 && nPart < 240 && nIdx + 2 < nLen ?
+				/* three bytes */ (nPart - 224 << 12) + (aChars[nIdx + 1] - 128 << 6) + aChars[nIdx + 2] - 128
+			: nPart > 191 && nPart < 224 && nIdx + 1 < nLen ?
+				/* two bytes */ (nPart - 192 << 6) + aChars[nIdx + 1] - 128
+			:
+				/* one byte */ nPart;
+
+	};
+
+	StringView.putUTF8CharCode = function (aTarget, nChar, nPutAt) {
+
+		var nIdx = nPutAt;
+
+		if (nChar < 0x80 /* 128 */) {
+			/* one byte */
+			aTarget[nIdx++] = nChar;
+		} else if (nChar < 0x800 /* 2048 */) {
+			/* two bytes */
+			aTarget[nIdx++] = 0xc0 /* 192 */ + (nChar >>> 6);
+			aTarget[nIdx++] = 0x80 /* 128 */ + (nChar & 0x3f /* 63 */);
+		} else if (nChar < 0x10000 /* 65536 */) {
+			/* three bytes */
+			aTarget[nIdx++] = 0xe0 /* 224 */ + (nChar >>> 12);
+			aTarget[nIdx++] = 0x80 /* 128 */ + ((nChar >>> 6) & 0x3f /* 63 */);
+			aTarget[nIdx++] = 0x80 /* 128 */ + (nChar & 0x3f /* 63 */);
+		} else if (nChar < 0x200000 /* 2097152 */) {
+			/* four bytes */
+			aTarget[nIdx++] = 0xf0 /* 240 */ + (nChar >>> 18);
+			aTarget[nIdx++] = 0x80 /* 128 */ + ((nChar >>> 12) & 0x3f /* 63 */);
+			aTarget[nIdx++] = 0x80 /* 128 */ + ((nChar >>> 6) & 0x3f /* 63 */);
+			aTarget[nIdx++] = 0x80 /* 128 */ + (nChar & 0x3f /* 63 */);
+		} else if (nChar < 0x4000000 /* 67108864 */) {
+			/* five bytes */
+			aTarget[nIdx++] = 0xf8 /* 248 */ + (nChar >>> 24);
+			aTarget[nIdx++] = 0x80 /* 128 */ + ((nChar >>> 18) & 0x3f /* 63 */);
+			aTarget[nIdx++] = 0x80 /* 128 */ + ((nChar >>> 12) & 0x3f /* 63 */);
+			aTarget[nIdx++] = 0x80 /* 128 */ + ((nChar >>> 6) & 0x3f /* 63 */);
+			aTarget[nIdx++] = 0x80 /* 128 */ + (nChar & 0x3f /* 63 */);
+		} else /* if (nChar <= 0x7fffffff) */ { /* 2147483647 */
+			/* six bytes */
+			aTarget[nIdx++] = 0xfc /* 252 */ + /* (nChar >>> 30) may be not safe in ECMAScript! So...: */ (nChar / 1073741824);
+			aTarget[nIdx++] = 0x80 /* 128 */ + ((nChar >>> 24) & 0x3f /* 63 */);
+			aTarget[nIdx++] = 0x80 /* 128 */ + ((nChar >>> 18) & 0x3f /* 63 */);
+			aTarget[nIdx++] = 0x80 /* 128 */ + ((nChar >>> 12) & 0x3f /* 63 */);
+			aTarget[nIdx++] = 0x80 /* 128 */ + ((nChar >>> 6) & 0x3f /* 63 */);
+			aTarget[nIdx++] = 0x80 /* 128 */ + (nChar & 0x3f /* 63 */);
+		}
+
+		return nIdx;
+
+	};
+
+	StringView.getUTF8CharLength = function (nChar) {
+		return nChar < 0x80 ? 1 : nChar < 0x800 ? 2 : nChar < 0x10000 ? 3 : nChar < 0x200000 ? 4 : nChar < 0x4000000 ? 5 : 6;
+	};
+
+	StringView.loadUTF16CharCode = function (aChars, nIdx) {
+
+		/* UTF-16 to DOMString decoding algorithm */
+		var nFrstChr = aChars[nIdx];
+
+		return nFrstChr > 0xD7BF /* 55231 */ && nIdx + 1 < aChars.length ?
+			(nFrstChr - 0xD800 /* 55296 */ << 10) + aChars[nIdx + 1] + 0x2400 /* 9216 */
+			: nFrstChr;
+
+	};
+
+	StringView.putUTF16CharCode = function (aTarget, nChar, nPutAt) {
+
+		var nIdx = nPutAt;
+
+		if (nChar < 0x10000 /* 65536 */) {
+			/* one element */
+			aTarget[nIdx++] = nChar;
+		} else {
+			/* two elements */
+			aTarget[nIdx++] = 0xD7C0 /* 55232 */ + (nChar >>> 10);
+			aTarget[nIdx++] = 0xDC00 /* 56320 */ + (nChar & 0x3FF /* 1023 */);
+		}
+
+		return nIdx;
+
+	};
+
+	StringView.getUTF16CharLength = function (nChar) {
+		return nChar < 0x10000 ? 1 : 2;
+	};
+
+	/* Array of bytes to base64 string decoding */
+
+	StringView.b64ToUint6 = function (nChr) {
+
+		return nChr > 64 && nChr < 91 ?
+				nChr - 65
+			: nChr > 96 && nChr < 123 ?
+				nChr - 71
+			: nChr > 47 && nChr < 58 ?
+				nChr + 4
+			: nChr === 43 ?
+				62
+			: nChr === 47 ?
+				63
+			:
+				0;
+
+	};
+
+	StringView.uint6ToB64 = function (nUint6) {
+
+		return nUint6 < 26 ?
+				nUint6 + 65
+			: nUint6 < 52 ?
+				nUint6 + 71
+			: nUint6 < 62 ?
+				nUint6 - 4
+			: nUint6 === 62 ?
+				43
+			: nUint6 === 63 ?
+				47
+			:
+				65;
+
+	};
+
+	/* Base64 string to array encoding */
+
+	StringView.bytesToBase64 = function (aBytes) {
+
+		var eqLen = (3 - (aBytes.length % 3)) % 3, sB64Enc = "";
+
+		for (var nMod3, nLen = aBytes.length, nUint24 = 0, nIdx = 0; nIdx < nLen; nIdx++) {
+			nMod3 = nIdx % 3;
+			/* Uncomment the following line in order to split the output in lines 76-character long: */
+			/*
+			if (nIdx > 0 && (nIdx * 4 / 3) % 76 === 0) { sB64Enc += "\r\n"; }
+			*/
+			nUint24 |= aBytes[nIdx] << (16 >>> nMod3 & 24);
+			if (nMod3 === 2 || aBytes.length - nIdx === 1) {
+				sB64Enc += String.fromCharCode(StringView.uint6ToB64(nUint24 >>> 18 & 63), StringView.uint6ToB64(nUint24 >>> 12 & 63), StringView.uint6ToB64(nUint24 >>> 6 & 63), StringView.uint6ToB64(nUint24 & 63));
+				nUint24 = 0;
+			}
+		}
+
+		return	eqLen === 0 ?
+				sB64Enc
+			:
+				sB64Enc.substring(0, sB64Enc.length - eqLen) + (eqLen === 1 ? "=" : "==");
+
+
+	};
+
+
+	StringView.base64ToBytes = function (sBase64, nBlockBytes) {
+
+		var
+			sB64Enc = sBase64.replace(/[^A-Za-z0-9\+\/]/g, ""), nInLen = sB64Enc.length,
+			nOutLen = nBlockBytes ? Math.ceil((nInLen * 3 + 1 >>> 2) / nBlockBytes) * nBlockBytes : nInLen * 3 + 1 >>> 2, aBytes = new Uint8Array(nOutLen);
+
+		for (var nMod3, nMod4, nUint24 = 0, nOutIdx = 0, nInIdx = 0; nInIdx < nInLen; nInIdx++) {
+			nMod4 = nInIdx & 3;
+			nUint24 |= StringView.b64ToUint6(sB64Enc.charCodeAt(nInIdx)) << 18 - 6 * nMod4;
+			if (nMod4 === 3 || nInLen - nInIdx === 1) {
+				for (nMod3 = 0; nMod3 < 3 && nOutIdx < nOutLen; nMod3++, nOutIdx++) {
+					aBytes[nOutIdx] = nUint24 >>> (16 >>> nMod3 & 24) & 255;
+				}
+				nUint24 = 0;
+			}
+		}
+
+		return aBytes;
+
+	};
+
+	StringView.makeFromBase64 = function (sB64Inpt, sEncoding, nByteOffset, nLength) {
+
+		return new StringView(sEncoding === "UTF-16" || sEncoding === "UTF-32" ? StringView.base64ToBytes(sB64Inpt, sEncoding === "UTF-16" ? 2 : 4).buffer : StringView.base64ToBytes(sB64Inpt), sEncoding, nByteOffset, nLength);
+
+	};
+
+	/* DEFAULT VALUES */
+
+	StringView.prototype.encoding = "UTF-8"; /* Default encoding... */
+
+	/* INSTANCES' METHODS */
+
+	StringView.prototype.makeIndex = function (nChrLength, nStartFrom) {
+
+		var
+
+			aTarget = this.rawData, nChrEnd, nRawLength = aTarget.length,
+			nStartIdx = nStartFrom || 0, nIdxEnd = nStartIdx, nStopAtChr = isNaN(nChrLength) ? Infinity : nChrLength;
+
+		if (nChrLength + 1 > aTarget.length) { throw new RangeError("StringView.prototype.makeIndex - The offset can\'t be major than the length of the array - 1."); }
+
+		switch (this.encoding) {
+
+			case "UTF-8":
+
+				var nPart;
+
+				for (nChrEnd = 0; nIdxEnd < nRawLength && nChrEnd < nStopAtChr; nChrEnd++) {
+					nPart = aTarget[nIdxEnd];
+					nIdxEnd += nPart > 251 && nPart < 254 && nIdxEnd + 5 < nRawLength ? 6
+						: nPart > 247 && nPart < 252 && nIdxEnd + 4 < nRawLength ? 5
+						: nPart > 239 && nPart < 248 && nIdxEnd + 3 < nRawLength ? 4
+						: nPart > 223 && nPart < 240 && nIdxEnd + 2 < nRawLength ? 3
+						: nPart > 191 && nPart < 224 && nIdxEnd + 1 < nRawLength ? 2
+						: 1;
+				}
+
+				break;
+
+			case "UTF-16":
+
+				for (nChrEnd = nStartIdx; nIdxEnd < nRawLength && nChrEnd < nStopAtChr; nChrEnd++) {
+					nIdxEnd += aTarget[nIdxEnd] > 0xD7BF /* 55231 */ && nIdxEnd + 1 < aTarget.length ? 2 : 1;
+				}
+
+				break;
+
+			default:
+
+				nIdxEnd = nChrEnd = isFinite(nChrLength) ? nChrLength : nRawLength - 1;
+
+		}
+
+		if (nChrLength) { return nIdxEnd; }
+
+		return nChrEnd;
+
+	};
+
+	StringView.prototype.toBase64 = function (bWholeBuffer) {
+
+		return StringView.bytesToBase64(
+			bWholeBuffer ?
+				(
+					this.bufferView.constructor === Uint8Array ?
+						this.bufferView
+					:
+						new Uint8Array(this.buffer)
+				)
+			: this.rawData.constructor === Uint8Array ?
+				this.rawData
+			:
+				new Uint8Array(this.buffer, this.rawData.byteOffset, this.rawData.length << (this.rawData.constructor === Uint16Array ? 1 : 2))
+			);
+
+	};
+
+	StringView.prototype.subview = function (nCharOffset /* optional */, nCharLength /* optional */) {
+
+		var
+
+			nChrLen, nCharStart, nStrLen, bVariableLen = this.encoding === "UTF-8" || this.encoding === "UTF-16",
+			nStartOffset = nCharOffset, nStringLength, nRawLen = this.rawData.length;
+
+		if (nRawLen === 0) {
+			return new StringView(this.buffer, this.encoding);
+		}
+
+		nStringLength = bVariableLen ? this.makeIndex() : nRawLen;
+		nCharStart = nCharOffset ? Math.max((nStringLength + nCharOffset) % nStringLength, 0) : 0;
+		nStrLen = Number.isInteger(nCharLength) ? Math.max(nCharLength, 0) + nCharStart > nStringLength ? nStringLength - nCharStart : nCharLength : nStringLength;
+
+		if (nCharStart === 0 && nStrLen === nStringLength) { return this; }
+
+		if (bVariableLen) {
+			nStartOffset = this.makeIndex(nCharStart);
+			nChrLen = this.makeIndex(nStrLen, nStartOffset) - nStartOffset;
+		} else {
+			nStartOffset = nCharStart;
+			nChrLen = nStrLen - nCharStart;
+		}
+
+		if (this.encoding === "UTF-16") {
+			nStartOffset <<= 1;
+		} else if (this.encoding === "UTF-32") {
+			nStartOffset <<= 2;
+		}
+
+		return new StringView(this.buffer, this.encoding, nStartOffset, nChrLen);
+
+	};
+
+	StringView.prototype.forEachChar = function (fCallback, oThat, nChrOffset, nChrLen) {
+
+		var aSource = this.rawData, nRawEnd, nRawIdx;
+
+		if (this.encoding === "UTF-8" || this.encoding === "UTF-16") {
+
+			var fGetInptChrSize, fGetInptChrCode;
+
+			if (this.encoding === "UTF-8") {
+				fGetInptChrSize = StringView.getUTF8CharLength;
+				fGetInptChrCode = StringView.loadUTF8CharCode;
+			} else if (this.encoding === "UTF-16") {
+				fGetInptChrSize = StringView.getUTF16CharLength;
+				fGetInptChrCode = StringView.loadUTF16CharCode;
+			}
+
+			nRawIdx = isFinite(nChrOffset) ? this.makeIndex(nChrOffset) : 0;
+			nRawEnd = isFinite(nChrLen) ? this.makeIndex(nChrLen, nRawIdx) : aSource.length;
+
+			for (var nChrCode, nChrIdx = 0; nRawIdx < nRawEnd; nChrIdx++) {
+				nChrCode = fGetInptChrCode(aSource, nRawIdx);
+				fCallback.call(oThat || null, nChrCode, nChrIdx, nRawIdx, aSource);
+				nRawIdx += fGetInptChrSize(nChrCode);
+			}
+
+		} else {
+
+			nRawIdx = isFinite(nChrOffset) ? nChrOffset : 0;
+			nRawEnd = isFinite(nChrLen) ? nChrLen + nRawIdx : aSource.length;
+
+			for (nRawIdx; nRawIdx < nRawEnd; nRawIdx++) {
+				fCallback.call(oThat || null, aSource[nRawIdx], nRawIdx, nRawIdx, aSource);
+			}
+
+		}
+
+	};
+
+	StringView.prototype.valueOf = StringView.prototype.toString = function () {
+
+		if (this.encoding !== "UTF-8" && this.encoding !== "UTF-16") {
+			/* ASCII, UTF-32 or BinaryString to DOMString */
+			return String.fromCharCode.apply(null, this.rawData);
+		}
+
+		var fGetCode, fGetIncr, sView = "";
+
+		if (this.encoding === "UTF-8") {
+			fGetIncr = StringView.getUTF8CharLength;
+			fGetCode = StringView.loadUTF8CharCode;
+		} else if (this.encoding === "UTF-16") {
+			fGetIncr = StringView.getUTF16CharLength;
+			fGetCode = StringView.loadUTF16CharCode;
+		}
+
+		for (var nChr, nLen = this.rawData.length, nIdx = 0; nIdx < nLen; nIdx += fGetIncr(nChr)) {
+			nChr = fGetCode(this.rawData, nIdx);
+			sView += String.fromCharCode(nChr);
+		}
+
+		return sView;
+
+	};
+
+	module.exports = StringView;
+
+/***/ },
+/* 39 */
 /***/ function(module, exports) {
 
 	class WebLoader {
@@ -3530,43 +4739,36 @@
 	module.exports = WebLoader
 
 /***/ },
-/* 34 */
+/* 40 */
 /***/ function(module, exports) {
 
-	
-	class MultiAgentPool {
+	class FileLoader {
 
-		constructor() {
-			this.agents = []
-		}
+		static download(file, callback) {
+			// Create XHR, Blob and FileReader objects
+		    var xhr = new XMLHttpRequest(), blob, fileReader = new FileReader();
 
-		add(agent) {
-			agent.pool = this
-			this.agents.push(agent)
-		}
+		    xhr.open("GET", file, true);
+		    // Set the responseType to arraybuffer. "blob" is an option too, rendering manual Blob creation unnecessary, but the support for "blob" is not widespread enough yet
+		    xhr.responseType = "arraybuffer";
 
-		learn() {
-			this.critic.freeze()
-			this.target.freeze()
+		    xhr.addEventListener("load", function () {
+		        if (xhr.status === 200) {
+		            callback(null, xhr.response)
+		        }
 
-			for (var i = 0; i < this.agents.length; i++) {
-				if (this.agents[i].options.startLearningAt > this.agents[i].age)
-					continue 
+		        else {
+		        	callback(xhr.status, null)
+		        }
+		    }, false);
 
-				this.agents[i].replay()
-
-				if (i === this.agents.length - 1) { // last one
-					this.critic.freeze(false)
-					this.target.freeze(false)
-				}
-
-				this.agents[i].algorithm.learn()
-			}
+		    // Send XHR
+		    xhr.send();
 		}
 
 	}
 
-	module.exports = MultiAgentPool
+	module.exports = FileLoader;
 
 /***/ }
 /******/ ]);

@@ -12,11 +12,13 @@ class FullyConnectedLayer {
 			output: opt.size,
 			parameters: input.length * opt.size.length + opt.size.length
 		}
+		
 	}
 
 	forward(ctx) {
 		var sum = 0.0, X = this.dimensions.input.length, Y = this.dimensions.output.length
 		var inpw = ctx.input.w, outw = ctx.output.w, paramw = ctx.params.w
+		
 
 		for (var i = 0; i < Y; i++) {
 			sum = 0.0
@@ -26,6 +28,8 @@ class FullyConnectedLayer {
 
 			outw[i] = sum + paramw[X * Y + i]
 		}
+
+		// outw.set(this.fwd(inpw, paramw));
 	}
 
 	backward(ctx) {

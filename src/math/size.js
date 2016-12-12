@@ -1,20 +1,29 @@
 module.exports = class Size {
 
 	static derive(val) {
-		if (val instanceof Size)
+		if (val instanceof Size) {
 			return val;
+		}
 
-		if (Number.isInteger(val))
-			return new Size(1, 1, val);
+		if (Number.isInteger(val)) {
+			return new Size(1, 1, val)
+		}
 
-		throw "could not derive size";
+		if (val instanceof Object) {
+			return new Size(val.x, val.y, val.z)
+		}
+
+		throw "Could not create size object";
 	}
 
 	constructor(x, y, z) {
-		this.x = x;
-		this.y = y;
-		this.z = z;
-		this.length = this.x * this.y * this.z;
+		this.x = x
+		this.y = y
+		this.z = z
+	}
+
+	get length() {
+		return this.x * this.y * this.z
 	}
 
 	get dimensions() {

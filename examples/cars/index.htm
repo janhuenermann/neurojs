@@ -13,7 +13,43 @@
 		.description {
 			padding: 0 20px;
 		}
+
+		.app-chart .ct-line {
+		  /* Control the thikness of your lines */
+		  stroke-width: 2px;
+		  /* Create a dashed line with a pattern */
+		  stroke-dasharray: 0 0;
+		}
+
+		.app-chart .ct-series-a .ct-line, .app-chart .ct-series-a .ct-point {
+			/* Set the colour of this series line */
+		  	stroke: #000 !important;
+		}
+
+		.app-chart .ct-series-b .ct-line, .app-chart .ct-series-b .ct-point {
+			/* Set the colour of this series line */
+		  	stroke: #14D969 !important;
+		}
+
+		/* This selector overrides the points style on line charts. Points on line charts are actually just very short strokes. This allows you to customize even the point size in CSS */
+		.app-chart .ct-point {
+		  /* Size of your points */
+		  stroke-width: 0;
+		}
+
+		.app-chart .ct-grid {
+			stroke: #eee;
+		    stroke-width: 1px;
+		    stroke-dasharray: 0; 
+		}
+
+		.app-chart .ct-label.ct-vertical.ct-start {
+			font-family: sans-serif;
+			color: #999;
+			font-weight: 300;
+		}
 	</style>
+	<link rel="stylesheet" type="text/css" href="vendor/chartist.min.css">
 	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
 </head>
 <body>
@@ -23,12 +59,17 @@
 		<p><strong>Click and drag to draw shapes, which must be avoided by the cars.</strong></p>
 		<button onclick="window.gcd.goSlow();">Go slow</button>
 		<button onclick="window.gcd.goFast();">Go fast</button><br>
+		<button onclick="window.downloadBrain(0);">Save agent</button><br>
+		<button onclick="window.saveEnv();">Save world</button><br>
 		<input type='file' accept='*/*' onchange='readBrain(event)'><br>
+		<input type='file' accept='*/*' onchange='readWorld(event)'><br>
 		<p>Agent's lifespan: <span id="agent-age">0</span>s</p>
 	</div>
 
 	<div id="container" style="width: 100%; max-width: 1200px; margin: 0 auto;"></div>
+	<div style="width: 100%; max-width: 1200px; margin: 40px auto;" class="ct-chart ct-double-octave app-chart"></div>
 
+	<script type="text/javascript" src="vendor/chartist.min.js"></script>
 	<script type="text/javascript" src="vendor/p2.min.js"></script> <!-- physics lib -->
 	<script type="text/javascript" src="vendor/pixi.min.js"></script> <!-- WebGL renderer -->
 	<script type="text/javascript" src="../../build/neurojs-v2.js"></script>  <!-- brain lib :P -->
