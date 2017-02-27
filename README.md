@@ -16,3 +16,7 @@
 
 # Blog post
 I wrote a blog post about this framework with an interactive car-demo embeded [on my blog](http://lab.janhuenermann.de/article/learning-to-drive#car-container), check it out!
+
+# Future
+- Support for service workers
+- LSTM and backpropagation through time
