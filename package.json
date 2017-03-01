@@ -7,6 +7,7 @@
     "example": "examples"
   },
   "scripts": {
+    "start":"webpack-dev-server --inline --progress",
     "build": "babel src -d lib"
   },
   "keywords": [
