@@ -15,14 +15,18 @@
     "reinforcement-learning",
     "deep-q-learning"
   ],
-  "author": "Jan Hünermann",
-  "license": "ISC",
+  "author": {
+    "name": "Jan Hünermann",
+    "url": "http://janhuenermann.com/"
+  },
+  "license": "MIT",
   "devDependencies": {
     "babel-cli": "^6.14.0",
     "babel-core": "^6.14.0",
     "babel-loader": "^6.2.5",
     "babel-preset-es2015": "^6.14.0",
-    "webpack": "^1.14.0"
+    "webpack": "^2.2.1",
+    "webpack-dev-server": "^2.4.1"
   },
   "dependencies": {
     "colors": "^1.1.2"

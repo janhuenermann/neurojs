@@ -16,18 +16,15 @@ Feel free to contribute. I appreciate any support, because frankly this is a big
 - [Advanced XOR](/examples/adv-xor)
 - [Andrej Karpathy's Waterworld](/examples/waterworld) (ConvNetJS replaced with NeuroJS)
 
-## Getting Started
-```
+## Running the examples
+```bash
 npm install
-
 webpack-dev-server
-
 ```
- Then open http://localhost:8080/examples/cars/index.htm in your browser
 
-## Blog post
-I wrote a blog post about this framework with an interactive car-demo embeded [on my blog](http://lab.janhuenermann.de/article/learning-to-drive#car-container), check it out!
+Open http://localhost:8080/examples/ in your browser and select the demo you want to run.
 
 ## Future
+- More examples (pong, improved cars, etc.)
 - Support for web workers
 - LSTM and backpropagation through time

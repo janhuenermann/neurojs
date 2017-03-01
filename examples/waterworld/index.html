@@ -3,7 +3,7 @@
  <head>
   <meta charset="utf-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-  <title>ConvNetJS Deep Q Learning Reinforcement Learning with Neural Network demo</title>
+  <title>Waterworld | NeuroJS</title>
   <meta name="description" content="">
   <meta name="author" content="">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -59,6 +59,8 @@
   </script>
   <style type="text/css">
       canvas { border: 1px solid white; }
+      body { font-family: sans-serif;  }
+      #wrap { margin: 0 auto; max-width: 800px; width: 100%;  }
     </style>
 
  </head>
@@ -69,16 +71,17 @@
    <!-- <canvas id="graph_canvas" width="350" height="150"></canvas><br /> -->
    <!-- <canvas id="net_canvas" width="700" height="200"></canvas><br /> -->
 
-   
-   <canvas id="canvas" width="700" height="500"></canvas>
+   <p>This demo was originally created by <a href="https://twitter.com/karpathy">Andrej Karpathy</a> for the project <a href="http://convnetjs.com/">ConvNetJS</a>, but was modified to use neurojs as the neural network back-end. In this case ConvNetJS was replaced by a DDPG agent. </p>
 
       <button onclick="goveryfast()">Go very fast</button>
-   <button onclick="gofast()">Go fast</button>
-   <button onclick="gonormal()">Go normal speed</button>
-   <button onclick="goslow()">Go slow</button><br />
-    <button onclick="downloadBrain()">Save</button><br />
-    <input type='file' accept='*/*' onchange='readBrain(event)'><br>
+      <button onclick="gofast()">Go fast</button>
+      <button onclick="gonormal()">Go normal speed</button>
+      <button onclick="goslow()">Go slow</button><br />
+      <button onclick="downloadBrain()">Save</button>
+      <input type='file' accept='*/*' onchange='readBrain(event)'><br>
 
+      <canvas id="canvas" width="700" height="500"></canvas>
+      
 
    <script src="rldemo.js"></script>
    </div>

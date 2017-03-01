@@ -1,12 +1,16 @@
-module.exports = {
-    entry: __dirname + "/src/framework.js",
+var path = require('path')
+
+const config = {
+    entry: './src/framework.js',
     output: {
-        path: __dirname,
-        filename: "build/neurojs-v2.js"
+        path: path.resolve(__dirname, 'build'),
+        filename: 'neurojs-v2.js'
     },
-//     module: {
-//   loaders: [
-//     { test: /\.js$/, exclude: /node_modules/, loader: "babel-loader" }
-//   ]
-// }
-};
+    // module: {
+    //   loaders: [
+    //     { test: /\.js$/, exclude: /node_modules/, loader: "babel-loader" }
+    //   ]
+    // }
+}
+
+module.exports = config

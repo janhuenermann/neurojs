@@ -1,7 +1,11 @@
-module.exports = {
-    entry: "./entry.js",
+var path = require('path')
+
+const config = {
+    entry: './src/entry.js',
     output: {
-        path: __dirname,
-        filename: "bundle.js"
+        path: path.resolve(__dirname, 'build'),
+        filename: 'bundle.js'
     }
-};
+}
+
+module.exports = config

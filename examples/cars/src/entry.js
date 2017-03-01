@@ -1,5 +1,5 @@
-var app = require('./src/index.js');
-var car = require('./src/car.js');
+var app = require('./index.js');
+var car = require('./car.js');
 
 function createLossChart() {
     var data = {
