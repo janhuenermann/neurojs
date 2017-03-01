@@ -22,7 +22,7 @@ Feel free to contribute. I appreciate any support, because frankly this is a big
 ### Running the examples
 ```bash
 npm install
-webpack-dev-server
+npm start
 ```
 
 Open `http://localhost:8080/examples/` in your browser and select the demo you want to run.
