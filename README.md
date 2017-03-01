@@ -1,6 +1,11 @@
+# neurojs
+neurojs is a JavaScript framework for deep learning in the browser. It mainly focuses on reinforcement learning, but can be used for any neural network based task. It contains neat demos to visualise these capabilities, for instance a 2D self-driving car. 
+
+Feel free to contribute. I appreciate any support, because frankly this is a big project to maintain!
+
 ![](examples/cars/images/screenshot.png)
 
-# neurojs - A machine learning framework for browsers
+### Features
 - Implements a full-stack neural-network based machine learning framework
 - Extended reinforcement-learning support
 	+ Uniform and prioritised replay buffers
@@ -9,22 +14,20 @@
 - Binary import and export of network configurations (weights etc.)
 - High-performance
 
-Feel free to contribute. I appreciate any support, because frankly this is a big project to maintain!
-
-## Examples
+### Examples
 - [Self-driving car](/examples/cars)
 - [Advanced XOR](/examples/adv-xor)
 - [Andrej Karpathy's Waterworld](/examples/waterworld) (ConvNetJS replaced with NeuroJS)
 
-## Running the examples
+### Running the examples
 ```bash
 npm install
 webpack-dev-server
 ```
 
-Open http://localhost:8080/examples/ in your browser and select the demo you want to run.
+Open `http://localhost:8080/examples/` in your browser and select the demo you want to run.
 
-## Future
+### Future
 - More examples (pong, improved cars, etc.)
 - Support for web workers
 - LSTM and backpropagation through time
