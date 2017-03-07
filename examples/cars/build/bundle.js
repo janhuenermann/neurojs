@@ -182,9 +182,8 @@
 	    this.options = opt
 
 	    this.world = world
-	    this.frequency = 15
+	    this.frequency = 20
 	    this.reward = 0
-	    this.rewardBonus = 0
 	    this.loaded = false
 
 	    this.loss = 0
@@ -194,17 +193,13 @@
 	    if (this.options.dynamicallyLoaded !== true) {
 	    	this.init(null, null)
 	    }
-
-	    this.car.onContact = (speed) => {
-	    	this.rewardBonus -= Math.max(speed, 50.0)
-	    };
 	    
 	};
 
 	agent.prototype.init = function (actor, critic) {
 	    var actions = 2
-	    var temporal = 1
-	    var states = this.car.states
+	    var temporal = 2
+	    var states = this.car.sensors.dimensions
 
 	    var input = window.neurojs.Agent.getInputDimension(states, actions, temporal)
 
@@ -223,12 +218,14 @@
 	        discount: 0.95, 
 
 	        experience: 75e3, 
+	        // buffer: window.neurojs.Buffers.UniformReplayBuffer,
+
 	        learningPerTick: 40, 
 	        startLearningAt: 900,
 
 	        theta: 0.05, // progressive copy
 
-	        alpha: 0.1 // advantage learning
+	        alpha: 0.2 // advantage learning
 
 	    })
 
@@ -248,21 +245,22 @@
 	    this.timer++
 
 	    if (this.timer % this.timerFrequency === 0) {
-	        var d = this.car.updateSensors()
-	        var vel = this.car.chassisBody.velocity
+	        this.car.update()
+
+	        var vel = this.car.speed.local
 	        var speed = this.car.speed.velocity
 
-	        this.reward = Math.pow(vel[1], 2) - 0.1 * Math.pow(vel[0], 2) - this.car.contact * 10 - this.car.impact * 20
+	        this.reward = Math.pow(vel[1], 2) - 0.10 * Math.pow(vel[0], 2) - this.car.contact * 10 - this.car.impact * 20
 
 	        if (Math.abs(speed) < 1e-2) { // punish no movement; it harms exploration
 	            this.reward -= 1.0 
 	        }
 
 	        this.loss = this.brain.learn(this.reward)
-	        this.action = this.brain.policy(d)
+	        this.action = this.brain.policy(this.car.sensors.data)
 	        
-	        this.rewardBonus = 0.0
 	        this.car.impact = 0
+	        this.car.step()
 	    }
 	    
 	    if (this.action) {
@@ -285,271 +283,236 @@
 	    sensors = __webpack_require__(5),
 	    tc = __webpack_require__(6);
 
-	function car(world, opt) {
-	    this.options = {
-	        sensors: [
+	class Car {
 
-	            { type: 'distance', angle: -45, length: 5 },
-	            { type: 'distance', angle: -30, length: 5 },
-	            { type: 'distance', angle: -15, length: 5 },
-	            { type: 'distance', angle: +0, length: 5 },
-	            { type: 'distance', angle: +15, length: 5 },
-	            { type: 'distance', angle: +30, length: 5 },
-	            { type: 'distance', angle: +45, length: 5 },
+	    constructor(world, opt) {
+	        this.maxSteer = Math.PI / 7
+	        this.maxEngineForce = 10
+	        this.maxBrakeForce = 5
+	        this.maxBackwardForce = 2
+	        this.linearDamping = 0.5
 
-	            { type: 'distance', angle: -225, length: 3 },
-	            { type: 'distance', angle: -195, length: 3 },
-	            { type: 'distance', angle: -180, length: 5 },
-	            { type: 'distance', angle: -165, length: 3 },
-	            { type: 'distance', angle: -135, length: 3 },
+	        this.contact = 0
+	        this.impact = 0
 
-	            { type: 'distance', angle: -10, length: 10 },
-	            { type: 'distance', angle: -3, length: 10 },
-	            { type: 'distance', angle: +0, length: 10 },
-	            { type: 'distance', angle: +3, length: 10 },
-	            { type: 'distance', angle: +10, length: 10 },
+	        this.world = world
 
-	            { type: 'distance', angle: +90, length: 7 },
-	            { type: 'distance', angle: -90, length: 7 },
-
-	            { type: 'speed' }
-
-	        ]
-	    };
-
-	    this.maxSteer = Math.PI / 7
-	    this.maxEngineForce = 10
-	    this.maxBrakeForce = 5
-	    this.maxBackwardForce = 2
-	    this.linearDamping = 0.5
-
-	    this.continuous = true
-
-	    this.contact = 0
-	    this.impact = 0
-
-	    this.world = world
-
-	    this.init()
-	};
-
-	car.TYPE = 2
-
-	car.prototype.init = function () {
-	    this.createPhysicalBody()
-
-	    this.sensors = sensors.build(this, this.options.sensors)
-	    this.speed = this.sensors[this.sensors.length - 1]
-
-	    this.states = 0 // sensor dimensonality
-
-	    for (var i = 0; i < this.sensors.length; i++) {
-	        this.states += this.sensors[i].dimensions
-	    }
-	    
-	    this.punishment = 0
-	    this.timer = 0.0
-	};
-
-	car.prototype.createPhysicalBody = function () {
-	    // Create a dynamic body for the chassis
-	    this.chassisBody = new p2.Body({
-	        mass: 1,
-	        damping: 0.2,
-	        angularDamping: 0.3
-	    });
-
-	    this.wheels = {}
-	    this.chassisBody.color = color.randomPastelHex();
-	    this.chassisBody.car = true;
-	    this.chassisBody.damping = this.linearDamping;
-
-	    var boxShape = new p2.Box({ width: 0.5, height: 1 });
-	    boxShape.entity = 2
-
-	    this.chassisBody.addShape(boxShape);
-	    this.chassisBody.gl_create = (function (sprite, r) {
-	        this.overlay = new PIXI.Graphics();
-	        this.overlay.visible = true;
-
-	        sprite.addChild(this.overlay);
-
-	        var wheels = new PIXI.Graphics()
-	        sprite.addChild(wheels)
-
-	        var w = 0.12, h = 0.22
-	        var space = 0.07
-	        var col = "#" + this.chassisBody.color.toString(16)
-	            col = parseInt(tc(col).darken(50).toHex(), 16)
-	        var alpha = 0.35, alphal = 0.9
-
-	        var tl = new PIXI.Graphics()
-	        var tr = new PIXI.Graphics()
-
-	        tl.beginFill(col, alpha)
-	        tl.position.x = -0.25
-	        tl.position.y = 0.5 - h / 2 - space
-	        tl.drawRect(-w / 2, -h / 2, w, h)
-	        tl.endFill()
-
-	        tr.beginFill(col, alpha)
-	        tr.position.x = 0.25
-	        tr.position.y = 0.5 - h / 2 - space
-	        tr.drawRect(-w / 2, -h / 2, w, h)
-	        tr.endFill()
-
-	        this.wheels.topLeft = tl
-	        this.wheels.topRight = tr
-
-	        wheels.addChild(tl)
-	        wheels.addChild(tr)
-
-	        wheels.beginFill(col, alpha)
-	        // wheels.lineStyle(0.01, col, alphal)
-	        wheels.drawRect(-0.25 - w / 2, -0.5 + space, w, h)
-	        wheels.endFill()
-
-	        wheels.beginFill(col, alpha)
-	        // wheels.lineStyle(0.01, col, alphal)
-	        wheels.drawRect(0.25 - w / 2, -0.5 + space, w, h)
-	        wheels.endFill()
-	    }).bind(this); 
-
-	    // Create the vehicle
-	    this.vehicle = new p2.TopDownVehicle(this.chassisBody);
-
-	    // Add one front wheel and one back wheel - we don't actually need four :)
-	    this.frontWheel = this.vehicle.addWheel({
-	        localPosition: [0, 0.5] // front
-	    });
-	    this.frontWheel.setSideFriction(50);
-
-	    // Back wheel
-	    this.backWheel = this.vehicle.addWheel({
-	        localPosition: [0, -0.5] // back
-	    })
-	    this.backWheel.setSideFriction(45) // Less side friction on back wheel makes it easier to drift
-	};
-
-	car.prototype.updateSensors = function () {
-	    var data = new Float64Array(this.states)
-	    for (var i = 0, k = 0; i < this.sensors.length; k += this.sensors[i].dimensions, i++) {
-	        this.sensors[i].update()
-	        data.set(this.sensors[i].read(), k)
+	        this.init()
 	    }
 
-	    if (k !== this.states) {
-	        throw 'unexpected';
+	    init() {
+	        this.createPhysicalBody()
+
+	        this.sensors = Car.Sensors.build(this)
+	        this.speed = this.sensors.getByType("speed")[0]
 	    }
 
-	    this.drawSensors()
+	    createPhysicalBody() {
+	        // Create a dynamic body for the chassis
+	        this.chassisBody = new p2.Body({
+	            mass: 1,
+	            damping: 0.2,
+	            angularDamping: 0.3,
+	            ccdSpeedThreshold: 0,
+	            ccdIterations: 40
+	        });
 
-	    return data
-	};
+	        this.wheels = {}
+	        this.chassisBody.color = color.randomPastelHex();
+	        this.chassisBody.car = true;
+	        this.chassisBody.damping = this.linearDamping;
 
+	        var boxShape = new p2.Box({ width: 0.5, height: 1 });
+	        boxShape.entity = Car.ShapeEntity
 
-	car.prototype.drawSensors = function () {
-	    if (this.overlay.visible !== true) {
-	        return ;
+	        this.chassisBody.addShape(boxShape);
+	        this.chassisBody.gl_create = (function (sprite, r) {
+	            this.overlay = new PIXI.Graphics();
+	            this.overlay.visible = true;
+
+	            sprite.addChild(this.overlay);
+
+	            var wheels = new PIXI.Graphics()
+	            sprite.addChild(wheels)
+
+	            var w = 0.12, h = 0.22
+	            var space = 0.07
+	            var col = "#" + this.chassisBody.color.toString(16)
+	                col = parseInt(tc(col).darken(50).toHex(), 16)
+	            var alpha = 0.35, alphal = 0.9
+
+	            var tl = new PIXI.Graphics()
+	            var tr = new PIXI.Graphics()
+
+	            tl.beginFill(col, alpha)
+	            tl.position.x = -0.25
+	            tl.position.y = 0.5 - h / 2 - space
+	            tl.drawRect(-w / 2, -h / 2, w, h)
+	            tl.endFill()
+
+	            tr.beginFill(col, alpha)
+	            tr.position.x = 0.25
+	            tr.position.y = 0.5 - h / 2 - space
+	            tr.drawRect(-w / 2, -h / 2, w, h)
+	            tr.endFill()
+
+	            this.wheels.topLeft = tl
+	            this.wheels.topRight = tr
+
+	            wheels.addChild(tl)
+	            wheels.addChild(tr)
+
+	            wheels.beginFill(col, alpha)
+	            // wheels.lineStyle(0.01, col, alphal)
+	            wheels.drawRect(-0.25 - w / 2, -0.5 + space, w, h)
+	            wheels.endFill()
+
+	            wheels.beginFill(col, alpha)
+	            // wheels.lineStyle(0.01, col, alphal)
+	            wheels.drawRect(0.25 - w / 2, -0.5 + space, w, h)
+	            wheels.endFill()
+	        }).bind(this); 
+
+	        // Create the vehicle
+	        this.vehicle = new p2.TopDownVehicle(this.chassisBody);
+
+	        // Add one front wheel and one back wheel - we don't actually need four :)
+	        this.frontWheel = this.vehicle.addWheel({
+	            localPosition: [0, 0.5] // front
+	        });
+	        this.frontWheel.setSideFriction(50);
+
+	        // Back wheel
+	        this.backWheel = this.vehicle.addWheel({
+	            localPosition: [0, -0.5] // back
+	        })
+	        this.backWheel.setSideFriction(45) // Less side friction on back wheel makes it easier to drift
 	    }
 
-	    this.overlay.clear();
-
-	    for (var i = 0; i < this.sensors.length; i++) {
-	        this.sensors[i].draw(this.overlay);
+	    update() {
+	        this.sensors.update()
 	    }
-	};
 
-	car.prototype.addToWorld = function () {
-	    this.chassisBody.position[0] = (Math.random() - .5) * this.world.size.w
-	    this.chassisBody.position[1] = (Math.random() - .5) * this.world.size.h
-	    this.chassisBody.angle = (Math.random() * 2.0 - 1.0) * Math.PI
+	    step() {
+	        this.draw()
+	    }
 
-	    this.world.p2.addBody(this.chassisBody)
-	    this.vehicle.addToWorld(this.world.p2)
-
-	   this.world.p2.on("beginContact", (event) => {
-
-	        if ((event.bodyA === this.chassisBody || event.bodyB === this.chassisBody)) {
-	            // this.onContact( Math.pow(this.chassisBody.velocity[1], 2) + Math.pow(this.chassisBody.velocity[0], 2) );
-	            this.contact++;
+	    draw() {
+	        if (this.overlay.visible !== true) {
+	            return
 	        }
 
-	   });
-
-	   this.world.p2.on("endContact", (event) => {
-
-	        if ((event.bodyA === this.chassisBody || event.bodyB === this.chassisBody)) {
-	            this.contact--;
-	        }
-
-	   })
-
-	   this.world.p2.on("impact", (event) => {
-
-	        if ((event.bodyA === this.chassisBody || event.bodyB === this.chassisBody)) {
-	            this.impact = Math.sqrt(Math.pow(this.chassisBody.velocity[0], 2) + Math.pow(this.chassisBody.velocity[1], 2))
-	        }
-
-	   })
-	};
-
-	car.prototype.handleKeyInput = function (k) {
-	    // Steer value zero means straight forward. Positive is left and negative right.
-	    // this.frontWheel.steerValue = this.maxSteer * (k.getN(37) - k.getN(39));
-
-	    // // Engine force forward
-	    // this.backWheel.engineForce = k.getN(38) * this.maxEngineForce;
-	    // this.backWheel.setBrakeForce(0);
-
-	    // if(k.get(40)) {
-	    //     if(this.backWheel.getSpeed() > 0.1){
-	    //         // Moving forward - add some brake force to slow down
-	    //         this.backWheel.setBrakeForce(this.maxBrakeForce);
-	    //     } else {
-	    //         // Moving backwards - reverse the engine force
-	    //         this.backWheel.setBrakeForce(0);
-	    //         this.backWheel.engineForce = -this.maxBackwardForce;
-	    //     }
-	    // }
-
-	    if (k.getD(83) === 1) {
-	        this.overlay.visible = !this.overlay.visible;
+	        this.overlay.clear() 
+	        this.sensors.draw(this.overlay)
 	    }
-	};
 
-	car.prototype.handle = function (throttle, handlebar) {
+	    handle(throttle, steer) {
+	        // Steer value zero means straight forward. Positive is left and negative right.
+	        this.frontWheel.steerValue = this.maxSteer * steer
 
-	    // Steer value zero means straight forward. Positive is left and negative right.
-	    this.frontWheel.steerValue = this.maxSteer * handlebar
-
-	    // Engine force forward
-	    var force = throttle * this.maxEngineForce
-	    if (force < 0) {
-
-	        if (this.backWheel.getSpeed() > 0.1) {
-	            this.backWheel.setBrakeForce(-throttle * this.maxBrakeForce)
-	            this.backWheel.engineForce = 0.0
+	        // Engine force forward
+	        var force = throttle * this.maxEngineForce
+	        if (force < 0) {
+	            if (this.backWheel.getSpeed() > 0.1) {
+	                this.backWheel.setBrakeForce(-throttle * this.maxBrakeForce)
+	                this.backWheel.engineForce = 0.0
+	            }
+	            else {
+	                this.backWheel.setBrakeForce(0)
+	                this.backWheel.engineForce = throttle * this.maxBackwardForce
+	            }
 	        }
-
 	        else {
 	            this.backWheel.setBrakeForce(0)
-	            this.backWheel.engineForce = throttle * this.maxBackwardForce
+	            this.backWheel.engineForce = force
 	        }
 
+	        this.wheels.topLeft.rotation = this.frontWheel.steerValue * 0.7071067812
+	        this.wheels.topRight.rotation = this.frontWheel.steerValue * 0.7071067812
 	    }
 
-	    else {
-	        this.backWheel.setBrakeForce(0)
-	        this.backWheel.engineForce = force
+	    handleKeyboard(k) {
+	        // To enable control of a car through the keyboard, uncomment:
+	        // this.handle((k.getN(38) - k.getN(40)), (k.getN(37) - k.getN(39)))
+
+	        if (k.getD(83) === 1) {
+	            this.overlay.visible = !this.overlay.visible;
+	        }
 	    }
 
-	    this.wheels.topLeft.rotation = this.frontWheel.steerValue * 0.7071067812
-	    this.wheels.topRight.rotation = this.frontWheel.steerValue * 0.7071067812
-	};
 
+	    addToWorld() {
+	        this.chassisBody.position[0] = (Math.random() - .5) * this.world.size.w
+	        this.chassisBody.position[1] = (Math.random() - .5) * this.world.size.h
+	        this.chassisBody.angle = (Math.random() * 2.0 - 1.0) * Math.PI
 
-	module.exports = car;
+	        this.world.p2.addBody(this.chassisBody)
+	        this.vehicle.addToWorld(this.world.p2)
+
+	        this.world.p2.on("beginContact", (event) => {
+	            if ((event.bodyA === this.chassisBody || event.bodyB === this.chassisBody)) {
+	                this.contact++;
+	            }
+	        });
+
+	        this.world.p2.on("endContact", (event) => {
+	            if ((event.bodyA === this.chassisBody || event.bodyB === this.chassisBody)) {
+	               this.contact--;
+	            }
+	        })
+
+	        this.world.p2.on("impact", (event) => {
+	            if ((event.bodyA === this.chassisBody || event.bodyB === this.chassisBody)) {
+	                this.impact = Math.sqrt(Math.pow(this.chassisBody.velocity[0], 2) + Math.pow(this.chassisBody.velocity[1], 2))
+	            }
+	        })
+	    }
+
+	}
+
+	Car.ShapeEntity = 2
+
+	Car.Sensors = (function () {
+	    var d = 0.05
+	    var r = -0.25 + d, l = +0.25 - d
+	    var b = -0.50 + d, t = +0.50 - d
+
+	    return sensors.SensorBlueprint.compile([
+
+	        { type: 'distance', angle: -45, length: 5, start: [ r, t ] },
+	        { type: 'distance', angle: -30, length: 5, start: [ 0, t ] },
+	        { type: 'distance', angle: -15, length: 5, start: [ 0, t ] },
+	        { type: 'distance', angle: +00, length: 5, start: [ 0, t ] },
+	        { type: 'distance', angle: +15, length: 5, start: [ 0, t ] },
+	        { type: 'distance', angle: +30, length: 5, start: [ 0, t ] },
+	        { type: 'distance', angle: +45, length: 5, start: [ l, t ]  },
+
+	        { type: 'distance', angle: +135, length: 5, start: [ l, b ]  },
+	        { type: 'distance', angle: +165, length: 5, start: [ 0, b ]  },
+	        { type: 'distance', angle: -180, length: 5, start: [ 0, b ]  },
+	        { type: 'distance', angle: -165, length: 5, start: [ 0, b ]  },
+	        { type: 'distance', angle: -135, length: 5, start: [ r, b ]  },
+
+	        { type: 'distance', angle: -10, length: 10, start: [ 0, t ]  },
+	        { type: 'distance', angle: -03, length: 10, start: [ 0, t ]  },
+	        { type: 'distance', angle: +00, length: 10, start: [ 0, t ]  },
+	        { type: 'distance', angle: +03, length: 10, start: [ 0, t ]  },
+	        { type: 'distance', angle: +10, length: 10, start: [ 0, t ]  },
+
+	        { type: 'distance', angle: +60, length: 5, start: [ l, 0 ]  },
+	        { type: 'distance', angle: +90, length: 5, start: [ l, 0 ]  },
+	        { type: 'distance', angle: +120, length: 5, start: [ l, 0 ]  },
+
+	        { type: 'distance', angle: -60, length: 5, start: [ r, 0 ]  },
+	        { type: 'distance', angle: -90, length: 5, start: [ r, 0 ]  },
+	        { type: 'distance', angle: -120, length: 5, start: [ r, 0 ]  },
+
+	        { type: 'speed' },
+
+	    ])
+	})()
+
+	module.exports = Car;
 
 /***/ },
 /* 4 */
@@ -589,173 +552,200 @@
 /***/ function(module, exports, __webpack_require__) {
 
 	var color = __webpack_require__(4);
+	var car = __webpack_require__(3)
 
-	function distanceSensor(car, opt) {
-		this.car = car;
-		this.angle = opt.angle / 180 * Math.PI;
-		this.length = opt.length || 10;
+	class Sensor {}
 
-		this.direction = [ Math.sin(this.angle), Math.cos(this.angle) ]
-		this.start = opt.start || [ 0, 0.1 ]
+	class DistanceSensor extends Sensor {
 
-	    this.localNormal = p2.vec2.create()
-	    this.globalRay = p2.vec2.create()
+	    constructor(car, opt) {
+	        super()
+	        this.type = "distance"
+	        this.car = car
+	        this.angle = opt.angle / 180 * Math.PI
+	        this.length = opt.length || 10
+	        this.absolute = opt.absolute || false
 
-	    this.ray = new p2.Ray({
-	        mode: p2.Ray.CLOSEST,
-	        direction: this.direction,
-	        length: this.length,
-	        checkCollisionResponse: false,
-	        skipBackfaces: true
-	    })
+	        this.direction = [ Math.sin(this.angle), Math.cos(this.angle) ]
+	        this.start = opt.start || [ 0, 0.1 ]
 
-	    this.updateLength(this.length);
+	        this.localNormal = p2.vec2.create()
+	        this.globalRay = p2.vec2.create()
 
-	    this.castedResult = new p2.RaycastResult()
-	    this.hit = false
-	    this.setDefault()
+	        this.ray = new p2.Ray({
+	            mode: p2.Ray.CLOSEST,
+	            direction: this.direction,
+	            length: this.length,
+	            checkCollisionResponse: false,
+	            skipBackfaces: true
+	        })
 
-	    this.data = new Float64Array(this.dimensions);
-	    this.highlighted = false
-	}
+	        this.setLength(this.length);
 
-	distanceSensor.prototype.dimensions = 3
+	        this.castedResult = new p2.RaycastResult()
+	        this.hit = false
+	        this.distance = 0.0
+	        this.entity = 0
 
-	distanceSensor.prototype.updateLength = function (v) {
-		this.length = v
-		this.ray.length = this.length
-		this.end = [ this.start[0] + this.direction[0] * this.length, this.start[1] + this.direction[1] * this.length ]
-		this.rayVector = [ this.end[0] - this.start[0], this.end[1] - this.start[1] ]
-	};
-
-	distanceSensor.prototype.setDefault = function () {
-		this.distance = 1.0
-		this.entity = 0
-		this.localNormal[0] = 0
-		this.localNormal[1] = 0
-		this.reflectionAngle = 0
-	};
-
-	distanceSensor.prototype.update = function () {
-		var vehicleBody = this.car.chassisBody;
-		if (vehicleBody.world === null)
-			return ;
-
-	    vehicleBody.toWorldFrame(this.ray.from, this.start);
-	    vehicleBody.toWorldFrame(this.ray.to, this.end);
-	    
-	    this.ray.update();
-	    this.castedResult.reset();
-
-	    vehicleBody.world.raycast(this.castedResult, this.ray);
-
-	    if (this.hit = this.castedResult.hasHit()) {
-	    	this.distance = this.castedResult.fraction
-	    	this.entity = this.castedResult.shape.entity
-
-	    	vehicleBody.vectorToLocalFrame(this.localNormal, this.castedResult.normal)
-	    	vehicleBody.vectorToWorldFrame(this.globalRay, this.rayVector)
-
-	    	this.reflectionAngle = Math.atan2( this.castedResult.normal[1], this.castedResult.normal[0] ) - Math.atan2( this.globalRay[1], this.globalRay[0] ) // = Math.atan2( this.localNormal[1], this.localNormal[0] ) - Math.atan2( this.rayVector[1], this.rayVector[0] )	
-	    	if (this.reflectionAngle > Math.PI / 2) this.reflectionAngle = Math.PI - this.reflectionAngle
-	    	if (this.reflectionAngle < -Math.PI / 2) this.reflectionAngle = Math.PI + this.reflectionAngle
-	    } 
-
-	    else {
-	    	this.setDefault();
+	        this.data = new Float64Array(DistanceSensor.dimensions)
 	    }
-	};
 
-	distanceSensor.prototype.draw = function (g) {
-		var dist = this.distance
-		var c = color.rgbToHex(Math.floor((1-this.distance) * 255), Math.floor((this.distance) * 128), 128)
-		g.lineStyle(this.highlighted ? 0.04 : 0.01, c, 0.5)
-		g.moveTo(this.start[0], this.start[1]);
-		g.lineTo(this.start[0] + this.direction[0] * this.length * dist, this.start[1] + this.direction[1] * this.length * dist);
-	};
+	    setLength(v) {
+	        this.length = v
+	        this.ray.length = this.length
+	        this.end = [ this.start[0] + this.direction[0] * this.length, this.start[1] + this.direction[1] * this.length ]
+	        this.rayVector = [ this.end[0] - this.start[0], this.end[1] - this.start[1] ]
+	    }
 
-	distanceSensor.prototype.read = function () {
-		if (this.hit) {
-			this.data[0] = 1.0 - this.distance
-			this.data[1] = this.reflectionAngle
-			this.data[2] = this.entity === 2 ? 1.0 : 0.0 // is car?
-		}
+	    update() {
+	        var vehicleBody = this.car.chassisBody;
+	        if (vehicleBody.world === null) {
+	            this.data.fill(0.0)
+	            return
+	        }
 
-		else {
-			this.data.fill(0.0)
-		}
+	        vehicleBody.toWorldFrame(this.ray.from, this.start);
+	        vehicleBody.toWorldFrame(this.ray.to, this.end);
+	        
+	        this.ray.update();
+	        this.castedResult.reset();
 
-		return this.data
-	};
-
+	        vehicleBody.world.raycast(this.castedResult, this.ray);
 
 
-	function speedSensor(car, opt) {
-		this.car = car
-		this.local = p2.vec2.create()
-		this.data = new Float64Array(this.dimensions)
+	        if (this.hit = this.castedResult.hasHit()) {
+	            this.distance = this.castedResult.fraction
+	            this.entity = this.castedResult.shape.entity
+
+	            // vehicleBody.vectorToWorldFrame(this.globalRay, this.rayVector)
+
+	            var angle = Math.atan2( this.castedResult.normal[1], this.castedResult.normal[0] ) - Math.atan2( this.globalRay[1], this.globalRay[0] ) // = Math.atan2( this.localNormal[1], this.localNormal[0] ) - Math.atan2( this.rayVector[1], this.rayVector[0] )    
+	            if (angle > Math.PI / 2) angle = Math.PI - angle
+	            if (angle < -Math.PI / 2) angle = Math.PI + angle
+	            
+	            this.data[0] = 1.0 - this.distance
+	            // this.data[1] = angle
+	            this.data[1] = this.entity === car.ShapeEntity ? 1.0 : 0.0 // is car?
+	            this.data[2] = 1.0 // hit?
+	        } 
+
+	        else {
+	            this.data.fill(0.0)
+	        }
+	    }
+
+	    draw(g) {
+	        var dist = this.hit ? this.distance : 1.0
+	        var c = color.rgbToHex(Math.floor((1-dist) * 255), Math.floor((dist) * 128), 128)
+	        g.lineStyle(this.highlighted ? 0.04 : 0.01, c, 0.5)
+	        g.moveTo(this.start[0], this.start[1]);
+	        g.lineTo(this.start[0] + this.direction[0] * this.length * dist, this.start[1] + this.direction[1] * this.length * dist);
+	    }
+
 	}
 
-	speedSensor.prototype.dimensions = 1
+	class SpeedSensor extends Sensor {
 
-	speedSensor.prototype.update = function () {
-		this.car.chassisBody.vectorToLocalFrame(this.local, this.car.chassisBody.velocity)
-		this.velocity = p2.vec2.len(this.car.chassisBody.velocity) * (this.local[1] > 0 ? 1.0 : -1.0)
-	};
+	    constructor(car, opt) {
+	        super()
+	        this.type = "speed"
+	        this.car = car
+	        this.local = p2.vec2.create()
+	        this.data = new Float64Array(SpeedSensor.dimensions)
+	    }
 
-	speedSensor.prototype.draw = function (g) {
-		if (g.__label === undefined) {
-			g.__label = new PIXI.Text('0 km/h', { font: '80px Helvetica Neue' });
-			g.__label.scale.x = (g.__label.scale.y = 3e-3);
-			g.addChild(g.__label);
-		}
+	    update() {
+	        this.car.chassisBody.vectorToLocalFrame(this.local, this.car.chassisBody.velocity)
+	        this.data[0] = this.velocity = p2.vec2.len(this.car.chassisBody.velocity) * (this.local[1] > 0 ? 1.0 : -1.0)
+	        this.data[1] = this.local[1]
+	        this.data[2] = this.local[0]
+	    }
 
-		g.__label.text = Math.floor(this.velocity * 3.6) + ' km/h';
-		g.__label.rotation = -this.car.chassisBody.interpolatedAngle;
-	};
+	    draw(g) {
+	        if (g.__label === undefined) {
+	            g.__label = new PIXI.Text('0 km/h', { font: '80px Helvetica Neue' });
+	            g.__label.scale.x = (g.__label.scale.y = 3e-3);
+	            g.addChild(g.__label);
+	        }
 
-	speedSensor.prototype.read = function () {
-		this.data[0] = this.velocity
+	        g.__label.text = Math.floor(this.velocity * 3.6) + ' km/h';
+	        g.__label.rotation = -this.car.chassisBody.interpolatedAngle;
+	    }
 
-		return this.data
 	}
 
 
-	function create(car, opt) {
-		switch (opt.type) {
-			case 'distance':
-				return new distanceSensor(car, opt);
-
-			case 'speed':
-				return new speedSensor(car, opt);
-
-			default: 
-				return null;
-		}
+	const sensorTypes = {
+	    "distance": DistanceSensor,
+	    "speed": SpeedSensor
 	}
 
-	function build(car, config) {
-		var out = [];
+	DistanceSensor.dimensions = 3
+	SpeedSensor.dimensions = 3
 
-		if (car.dynamicForwardSensor) {
-			config = config.splice(0, 0, { type: 'distance', angle: +0, length: 0 });
-		}
+	class SensorArray {
 
-		for (var i = 0; i < config.length; i++) {
-			var sensor = create(car, config[i]);
-			if (sensor !== null) {
-				out.push(sensor);
-			}
-		}
+	    constructor(car, blueprint) {
+	        this.sensors = []
+	        this.dimensions = blueprint.dimensions
+	        this.data = new Float64Array(blueprint.dimensions)
 
-		return out;
+	        for (var i = 0; i < blueprint.list.length; i++) {
+	            var opt = blueprint.list[i]
+	            this.sensors.push(new sensorTypes[opt.type](car, opt))
+	        }
+	    }
+
+	    update() {
+	        for (var i = 0, k = 0; i < this.sensors.length; k += this.sensors[i].data.length, i++) {
+	            this.sensors[i].update()
+	            this.data.set(this.sensors[i].data, k)
+	        }
+	    }
+
+	    draw(g) {
+	        for (var i = 0; i < this.sensors.length; i++) {
+	            this.sensors[i].draw(g)
+	        }
+	    }
+
+	    getByType(type) {
+	        for (var i = 0, found = []; i < this.sensors.length; i++) {
+	            if (this.sensors[i].type === type) {
+	                found.push(this.sensors[i])
+	            }
+	        }
+	        return found
+	    }
+
+	}
+
+	class SensorBlueprint {
+
+	    constructor(list) {
+	        this.list = list
+	        this.dimensions = 0
+
+	        for (var i = 0; i < this.list.length; i++) {
+	            var opt = this.list[i]
+	            this.dimensions += sensorTypes[opt.type].dimensions
+	        }
+	    }
+
+	    build(car) {
+	        return new SensorArray(car, this)
+	    }
+
+
+	    static compile(list) {
+	        return new SensorBlueprint(list)
+	    }
+
 	}
 
 
 	module.exports = {
-		distance: distanceSensor,
-		speed: speedSensor,
-		build: build
+	    SensorArray, SensorBlueprint
 	};
 
 /***/ },
@@ -2420,6 +2410,7 @@
 
 	var agent = __webpack_require__(2)
 	var color = __webpack_require__(4)
+	var car = __webpack_require__(3)
 
 	function world() {
 	    this.agents = [];
@@ -2428,8 +2419,8 @@
 	    });
 
 	    this.p2.solver.tolerance = 5e-2
-	    this.p2.solver.iterations = 15
-	    this.p2.setGlobalStiffness(1e6)
+	    this.p2.solver.iterations = 50
+	    this.p2.setGlobalStiffness(1e7)
 	    this.p2.setGlobalRelaxation(5)
 
 	    this.age = 0.0
@@ -2445,7 +2436,7 @@
 
 	    this.obstacles = []
 
-	    var input = 118, actions = 2
+	    var state = car.Sensors.dimensions, actions = 2, input = 3 * state + 2 * actions
 	    this.brains = {
 
 	        actor: new window.neurojs.Network.Model([
@@ -2453,7 +2444,7 @@
 	            { type: 'input', size: input },
 	            { type: 'fc', size: 50, activation: 'relu' },
 	            { type: 'fc', size: 50, activation: 'relu' },
-	            { type: 'fc', size: 50, activation: 'relu', dropout: 0.5 },
+	            { type: 'fc', size: 50, activation: 'relu', dropout: 0.30 },
 	            { type: 'fc', size: actions, activation: 'tanh' },
 	            { type: 'regression' }
 
@@ -2463,8 +2454,9 @@
 	        critic: new window.neurojs.Network.Model([
 
 	            { type: 'input', size: input + actions },
-	            { type: 'fc', size: 100, activation: 'relu' },
-	            { type: 'fc', size: 100, activation: 'relu' },
+	            { type: 'fc', size: 70, activation: 'relu' },
+	            { type: 'fc', size: 60, activation: 'relu' },
+	            { type: 'fc', size: 50, activation: 'relu' },
 	            { type: 'fc', size: 1 },
 	            { type: 'regression' }
 

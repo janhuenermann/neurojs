@@ -53,19 +53,22 @@ class FullyConnectedLayer {
 	}
 
 	initialize(params) {
+		var X = this.dimensions.input.length, Y = this.dimensions.output.length
+
 		if (this.options.init) {
-			params.w.randf(this.options.init[0], this.options.init[1])
-			return 
+			params.w.randn(0.0, this.options.init)
 		}
 
-		var X = this.dimensions.input.length, Y = this.dimensions.output.length
-		var dropout = this.options.dropout || 0
-		var elements = (1 - dropout) * (this.dimensions.input.length + this.dimensions.output.length)
-		var scale = Math.sqrt(2.0 / elements)
-		params.w.randn(0.0, scale)
+		else {
+			// var dropout = this.options.dropout || 0
+			// var elements = (1 - dropout) * (this.dimensions.input.length + this.dimensions.output.length)
+			var scale = Math.sqrt(1.0 / X)
+			params.w.randn((this.options.mean / X) || 0.0, scale)
+		}
 
-		if (this.options.customInit) {
-			this.options.customInit(params.w);
+		// biases should be zero
+		for (var i = 0; i < Y; i++) {
+			params.w[X * Y + i] = 0.0
 		}
 	}
 

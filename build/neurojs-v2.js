@@ -63,7 +63,7 @@
 /******/ 	__webpack_require__.p = "";
 
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 40);
+/******/ 	return __webpack_require__(__webpack_require__.s = 41);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -319,9 +319,10 @@ var input = __webpack_require__(30)
 var regression = __webpack_require__(33)
 var noise = __webpack_require__(31)
 var bayesian = __webpack_require__(27)
+var variational = __webpack_require__(34)
 
 var Size = __webpack_require__(1)
-var Tensor = __webpack_require__(34)
+var Tensor = __webpack_require__(35)
 var Optim = __webpack_require__(4)
 
 var SharedConfiguration = __webpack_require__(3)
@@ -487,13 +488,15 @@ class Model {
 			case 'dropout': return new dropout.DropOutLayer(inp, opt)
 			case 'sigmoid': return new nonlinear.SigmoidLayer(inp, opt)
 			case 'tanh': return new nonlinear.TanhLayer(inp, opt)
-			case 'relu': return new nonlinear.ReLuLayer(inp, opt)
+			case 'relu': return new nonlinear.ReLULayer(inp, opt)
+			case 'elu': return new nonlinear.ELULayer(inp, opt)
 			case 'input': return new input.InputLayer(inp, opt)
 			case 'regression': return new regression.RegressionLayer(inp, opt)
 			case 'softmax': return new regression.SoftmaxLayer(inp, opt)
 			case 'noise': return new noise.UhlenbeckOrnsteinNoiseLayer(inp, opt)
 			case 'bayesian': return new bayesian.VariationalBayesianLayer(inp, opt)
-			case 'conf': return new bayesian.ConfidenceLayer(inp, opt)
+			case 'variational': return new variational.VariationalLayer(inp, opt)
+			case 'binary': return new variational.VariationalBinaryLayer(inp, opt)
 		}
 
 		throw 'error'
@@ -1547,7 +1550,7 @@ module.exports = NetOnDisk
 /* 7 */
 /***/ (function(module, exports, __webpack_require__) {
 
-/* WEBPACK VAR INJECTION */(function(global) {var StringView = __webpack_require__(39);
+/* WEBPACK VAR INJECTION */(function(global) {var StringView = __webpack_require__(40);
 
 function isObjLiteral(_obj) {
   var _test  = _obj;
@@ -2217,11 +2220,11 @@ Object.assign(Float64Array.prototype, {
 /***/ (function(module, exports, __webpack_require__) {
 
 // var network = require('../network.js')
-var Window = __webpack_require__(35)
-var Experience = __webpack_require__(38)
+var Window = __webpack_require__(36)
+var Experience = __webpack_require__(39)
 var Buffers = __webpack_require__(5)
-var DQN = __webpack_require__(37)
-var DDPG = __webpack_require__(36)
+var DQN = __webpack_require__(38)
+var DDPG = __webpack_require__(37)
 
 /**
  * The Agent class represents the
@@ -3074,10 +3077,6 @@ class VariationalBayesianLayer {
 		var sampled = ctx.sample, weights = ctx.weights, epsilon = 0
 		var mu, std, w, b
 
-		if (ctx.state.options.uncertainty) {
-			return this.uncertainty(ctx)
-		}
-
 		for (var i = 0; i < Y; i++) {
 			sum = 0.0
 			for (var j = 0; j < X; j++) {
@@ -3099,29 +3098,6 @@ class VariationalBayesianLayer {
 			outw[i] = sum + b
 		}
 
-	}
-
-	uncertainty(ctx) {
-		var sum = 0.0, X = this.dimensions.input.length, Y = this.dimensions.output.length
-		var inpw = ctx.input.w, outw = ctx.output.w, paramw = ctx.params.w
-		var std, mu, w, b, dir = ctx.state.options.uncertainty
-
-		for (var i = 0; i < Y; i++) {
-			sum = 0.0
-			for (var j = 0; j < X; j++) {
-				mu = paramw[(i * X + j) * 2 + 0] 
-				std = Math.log(1 + Math.exp( paramw[(i * X + j) * 2 + 1] ))
-				w = mu + dir * std
-
-				sum += inpw[j] * w
-			}
-
-			mu = paramw[(X * Y + i) * 2 + 0] 
-			std = Math.log(1 + Math.exp( paramw[(X * Y + i) * 2 + 1] ))
-			b = mu + dir * std
-
-			outw[i] = sum + b
-		}
 	}
 
 	backward(ctx) {
@@ -3160,55 +3136,8 @@ class VariationalBayesianLayer {
 
 }
 
-class ConfidenceLayer {
-
-	constructor(input, opt) {
-
-		this.dimensions = {
-			input,
-			output: new Size(1, 1, input.length / 2),
-			parameters: 0
-		}
-
-		this.storage = {
-			sample: this.dimensions.output.length
-		}
-
-
-	}
-
-	forward(ctx) {
-		var Y = this.dimensions.output.length
-		var inpw = ctx.input.w, outw = ctx.output.w
-		var sampled = ctx.sample
-
-		for (var i = 0; i < Y; i++) {
-			var mu = inpw[i * 2 + 0]
-			var std = inpw[i * 2 + 1]
-
-			sampled[i] = Math.randn()
-			outw[i] = mu + sampled[i] * std
-		}
-
-	}
-
-	backward(ctx) {
-		var Y = this.dimensions.output.length
-		var inpw = ctx.input.w, outw = ctx.output.w
-		var inpdw = ctx.input.dw, outdw = ctx.output.dw
-		var sampled = ctx.sample
-
-		for (var i = 0; i < Y; i++) {
-			inpdw[i * 2 + 0] = outdw[i]
-			inpdw[i * 2 + 1] = sampled[i] * outdw[i]
-		}
-	}
-
-
-}
-
 module.exports = {
-	VariationalBayesianLayer, ConfidenceLayer
+	VariationalBayesianLayer
 }
 
 /***/ }),
@@ -3271,19 +3200,22 @@ class FullyConnectedLayer {
 	}
 
 	initialize(params) {
+		var X = this.dimensions.input.length, Y = this.dimensions.output.length
+
 		if (this.options.init) {
-			params.w.randf(this.options.init[0], this.options.init[1])
-			return 
+			params.w.randn(0.0, this.options.init)
 		}
 
-		var X = this.dimensions.input.length, Y = this.dimensions.output.length
-		var dropout = this.options.dropout || 0
-		var elements = (1 - dropout) * (this.dimensions.input.length + this.dimensions.output.length)
-		var scale = Math.sqrt(2.0 / elements)
-		params.w.randn(0.0, scale)
+		else {
+			// var dropout = this.options.dropout || 0
+			// var elements = (1 - dropout) * (this.dimensions.input.length + this.dimensions.output.length)
+			var scale = Math.sqrt(1.0 / X)
+			params.w.randn((this.options.mean / X) || 0.0, scale)
+		}
 
-		if (this.options.customInit) {
-			this.options.customInit(params.w);
+		// biases should be zero
+		for (var i = 0; i < Y; i++) {
+			params.w[X * Y + i] = 0.0
 		}
 	}
 
@@ -3524,7 +3456,7 @@ class TanhLayer extends NonLinearityLayer {
 
 }
 
-class ReLuLayer extends NonLinearityLayer {
+class ReLULayer extends NonLinearityLayer {
 
 	constructor(input, opt) {
 		super(input, opt)
@@ -3537,7 +3469,7 @@ class ReLuLayer extends NonLinearityLayer {
 		var y = 0.0;
 
 		for (var i = 0; i < X; i++) {
-			outw[i] = inpw[i] > 0.0 ? inpw[i] : this.leaky * inpw[i];
+			outw[i] = (inpw[i] > 0.0 ? inpw[i] : this.leaky * inpw[i]);
 		}
 	}
 
@@ -3547,14 +3479,43 @@ class ReLuLayer extends NonLinearityLayer {
 		var inpdw = ctx.input.dw, outdw = ctx.output.dw
 
 		for (var i = 0; i < X; i++) {
-			inpdw[i] = inpw[i] > 0.0 ? outdw[i] : this.leaky * outdw[i];
+			inpdw[i] = (inpw[i] > 0.0 ? 1.0 : this.leaky) * outdw[i];
+		}
+	}
+
+}
+
+class ELULayer extends NonLinearityLayer {
+
+	constructor(input, opt) {
+		super(input, opt)
+		this.alpha = opt.alpha || 1.0
+	}
+
+	forward(ctx) {
+		var X = this.dimensions.input.length
+		var inpw = ctx.input.w, outw = ctx.output.w
+		var y = 0.0;
+
+		for (var i = 0; i < X; i++) {
+			outw[i] = (inpw[i] > 0.0 ? inpw[i] : this.alpha * (Math.exp(inpw[i]) - 1));
+		}
+	}
+
+	backward(ctx) {
+		var X = this.dimensions.input.length
+		var inpw = ctx.input.w, outw = ctx.output.w
+		var inpdw = ctx.input.dw, outdw = ctx.output.dw
+
+		for (var i = 0; i < X; i++) {
+			inpdw[i] = (inpw[i] > 0.0 ? 1.0 : outw[i] + this.alpha) * outdw[i];
 		}
 	}
 
 }
 
 module.exports = {
-	SigmoidLayer, TanhLayer, ReLuLayer
+	SigmoidLayer, TanhLayer, ReLULayer, ELULayer
 };
 
 /***/ }),
@@ -3693,6 +3654,116 @@ module.exports = {
 /* 34 */
 /***/ (function(module, exports, __webpack_require__) {
 
+"use strict";
+
+
+var Size = __webpack_require__(1);
+
+function sigm(x) {
+    return 1 / (1 + Math.exp(-x))
+}
+
+function dsigm(fx) {
+    return fx * (1.0 - fx)
+}
+
+class VariationalLayer {
+
+    constructor(input, opt) {
+        if (input.length % 2 !== 0) {
+            throw 'input must be divisible by two.'
+        }
+
+        this.dimensions = {
+            input: input,
+            output: new Size(1, 1, input.length / 2),
+            parameters: 0
+        }
+
+        this.storage = {
+            samples: this.dimensions.output.length
+        }
+
+        this.variance_decay = opt.variance_decay || 0.0
+        
+    }
+
+    forward(ctx) {
+        var Y = this.dimensions.output.length
+        var inpw = ctx.input.w, outw = ctx.output.w
+        var samples = ctx.samples
+
+        for (var i = 0; i < Y; i++) {
+            var eps = Math.randn(0.0, 1.0)
+            outw[i] = inpw[2 * i + 0] + inpw[2 * i + 1] * eps
+            samples[i] = eps
+        }
+    }
+
+    backward(ctx) {
+        var Y = this.dimensions.output.length
+        var inpw = ctx.input.w, outw = ctx.output.w
+        var inpdw = ctx.input.dw, outdw = ctx.output.dw
+        var samples = ctx.samples
+
+        for (var i = 0; i < Y; i++) {
+            inpdw[2 * i + 0] += outdw[i]
+            inpdw[2 * i + 1] += samples[i] * outdw[i]
+        }
+    }
+
+}
+
+
+class VariationalBinaryLayer {
+
+    constructor(input, opt) {
+        this.dimensions = {
+            input: input,
+            output: new Size(1, 1, input.length),
+            parameters: 0
+        }
+
+        this.storage = {
+            probs: this.dimensions.output.length
+        }
+        
+    }
+
+    forward(ctx) {
+        var Y = this.dimensions.output.length
+        var inpw = ctx.input.w, outw = ctx.output.w
+        var probs = ctx.probs
+
+        for (var i = 0; i < Y; i++) {
+            var eps = Math.random()
+            probs[i] = sigm(inpw[i]) // activate with probability
+            outw[i] = eps <= probs[i] ? 1.0 : 0.0
+        }
+    }
+
+    backward(ctx) {
+        var Y = this.dimensions.output.length
+        var inpw = ctx.input.w, outw = ctx.output.w
+        var inpdw = ctx.input.dw, outdw = ctx.output.dw
+        var probs = ctx.probs
+
+        for (var i = 0; i < Y; i++) {
+            inpdw[i] = dsigm( probs[i] ) * outdw[i]
+        }
+    }
+
+}
+
+
+module.exports = {
+    VariationalBinaryLayer
+}
+
+/***/ }),
+/* 35 */
+/***/ (function(module, exports, __webpack_require__) {
+
 var Size = __webpack_require__(1);
 
 module.exports = class Tensor {
@@ -3706,7 +3777,7 @@ module.exports = class Tensor {
 }
 
 /***/ }),
-/* 35 */
+/* 36 */
 /***/ (function(module, exports) {
 
 class Window {
@@ -3737,7 +3808,7 @@ class Window {
 module.exports = Window
 
 /***/ }),
-/* 36 */
+/* 37 */
 /***/ (function(module, exports, __webpack_require__) {
 
 var network = __webpack_require__(2)
@@ -3930,7 +4001,7 @@ class DDPG extends Algorithm {
 module.exports = DDPG;
 
 /***/ }),
-/* 37 */
+/* 38 */
 /***/ (function(module, exports, __webpack_require__) {
 
 var Algorithm = __webpack_require__(10)
@@ -4060,7 +4131,7 @@ class DQN extends Algorithm {
 module.exports = DQN;
 
 /***/ }),
-/* 38 */
+/* 39 */
 /***/ (function(module, exports) {
 
 class Experience {
@@ -4113,7 +4184,7 @@ class Experience {
 module.exports = Experience
 
 /***/ }),
-/* 39 */
+/* 40 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4800,7 +4871,7 @@ StringView.prototype.valueOf = StringView.prototype.toString = function () {
 module.exports = StringView;
 
 /***/ }),
-/* 40 */
+/* 41 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";

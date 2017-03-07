@@ -7,6 +7,7 @@ var input = require('./layers/input.js')
 var regression = require('./layers/regression.js')
 var noise = require('./layers/noise.js')
 var bayesian = require('./layers/bayesian.js')
+var variational = require('./layers/variational.js')
 
 var Size = require('./math/size.js')
 var Tensor = require('./math/tensor.js')
@@ -175,13 +176,15 @@ class Model {
 			case 'dropout': return new dropout.DropOutLayer(inp, opt)
 			case 'sigmoid': return new nonlinear.SigmoidLayer(inp, opt)
 			case 'tanh': return new nonlinear.TanhLayer(inp, opt)
-			case 'relu': return new nonlinear.ReLuLayer(inp, opt)
+			case 'relu': return new nonlinear.ReLULayer(inp, opt)
+			case 'elu': return new nonlinear.ELULayer(inp, opt)
 			case 'input': return new input.InputLayer(inp, opt)
 			case 'regression': return new regression.RegressionLayer(inp, opt)
 			case 'softmax': return new regression.SoftmaxLayer(inp, opt)
 			case 'noise': return new noise.UhlenbeckOrnsteinNoiseLayer(inp, opt)
 			case 'bayesian': return new bayesian.VariationalBayesianLayer(inp, opt)
-			case 'conf': return new bayesian.ConfidenceLayer(inp, opt)
+			case 'variational': return new variational.VariationalLayer(inp, opt)
+			case 'binary': return new variational.VariationalBinaryLayer(inp, opt)
 		}
 
 		throw 'error'

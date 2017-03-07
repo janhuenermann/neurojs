@@ -1,7 +1,7 @@
 # neurojs
 neurojs is a JavaScript framework for deep learning in the browser. It mainly focuses on reinforcement learning, but can be used for any neural network based task. It contains neat demos to visualise these capabilities, for instance a 2D self-driving car. 
 
-Feel free to contribute. I appreciate any support, because frankly this is a big project to maintain!
+Feel free to contribute. The development on such projects is more awesome in a community!
 
 ![](examples/cars/images/screenshot.png)
 
@@ -27,7 +27,7 @@ npm start
 
 Open `http://localhost:8080/examples/` in your browser and select the demo you want to run.
 
-### Future
+### What's next?
 - More examples (pong, improved cars, etc.)
 - Support for web workers
 - LSTM and backpropagation through time

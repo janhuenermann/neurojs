@@ -60,7 +60,7 @@ class TanhLayer extends NonLinearityLayer {
 
 }
 
-class ReLuLayer extends NonLinearityLayer {
+class ReLULayer extends NonLinearityLayer {
 
 	constructor(input, opt) {
 		super(input, opt)
@@ -73,7 +73,7 @@ class ReLuLayer extends NonLinearityLayer {
 		var y = 0.0;
 
 		for (var i = 0; i < X; i++) {
-			outw[i] = inpw[i] > 0.0 ? inpw[i] : this.leaky * inpw[i];
+			outw[i] = (inpw[i] > 0.0 ? inpw[i] : this.leaky * inpw[i]);
 		}
 	}
 
@@ -83,12 +83,41 @@ class ReLuLayer extends NonLinearityLayer {
 		var inpdw = ctx.input.dw, outdw = ctx.output.dw
 
 		for (var i = 0; i < X; i++) {
-			inpdw[i] = inpw[i] > 0.0 ? outdw[i] : this.leaky * outdw[i];
+			inpdw[i] = (inpw[i] > 0.0 ? 1.0 : this.leaky) * outdw[i];
+		}
+	}
+
+}
+
+class ELULayer extends NonLinearityLayer {
+
+	constructor(input, opt) {
+		super(input, opt)
+		this.alpha = opt.alpha || 1.0
+	}
+
+	forward(ctx) {
+		var X = this.dimensions.input.length
+		var inpw = ctx.input.w, outw = ctx.output.w
+		var y = 0.0;
+
+		for (var i = 0; i < X; i++) {
+			outw[i] = (inpw[i] > 0.0 ? inpw[i] : this.alpha * (Math.exp(inpw[i]) - 1));
+		}
+	}
+
+	backward(ctx) {
+		var X = this.dimensions.input.length
+		var inpw = ctx.input.w, outw = ctx.output.w
+		var inpdw = ctx.input.dw, outdw = ctx.output.dw
+
+		for (var i = 0; i < X; i++) {
+			inpdw[i] = (inpw[i] > 0.0 ? 1.0 : outw[i] + this.alpha) * outdw[i];
 		}
 	}
 
 }
 
 module.exports = {
-	SigmoidLayer, TanhLayer, ReLuLayer
+	SigmoidLayer, TanhLayer, ReLULayer, ELULayer
 };

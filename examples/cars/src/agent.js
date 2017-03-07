@@ -5,9 +5,8 @@ function agent(opt, world) {
     this.options = opt
 
     this.world = world
-    this.frequency = 15
+    this.frequency = 20
     this.reward = 0
-    this.rewardBonus = 0
     this.loaded = false
 
     this.loss = 0
@@ -17,17 +16,13 @@ function agent(opt, world) {
     if (this.options.dynamicallyLoaded !== true) {
     	this.init(null, null)
     }
-
-    this.car.onContact = (speed) => {
-    	this.rewardBonus -= Math.max(speed, 50.0)
-    };
     
 };
 
 agent.prototype.init = function (actor, critic) {
     var actions = 2
-    var temporal = 1
-    var states = this.car.states
+    var temporal = 2
+    var states = this.car.sensors.dimensions
 
     var input = window.neurojs.Agent.getInputDimension(states, actions, temporal)
 
@@ -46,12 +41,14 @@ agent.prototype.init = function (actor, critic) {
         discount: 0.95, 
 
         experience: 75e3, 
+        // buffer: window.neurojs.Buffers.UniformReplayBuffer,
+
         learningPerTick: 40, 
         startLearningAt: 900,
 
         theta: 0.05, // progressive copy
 
-        alpha: 0.1 // advantage learning
+        alpha: 0.2 // advantage learning
 
     })
 
@@ -71,21 +68,22 @@ agent.prototype.step = function (dt) {
     this.timer++
 
     if (this.timer % this.timerFrequency === 0) {
-        var d = this.car.updateSensors()
-        var vel = this.car.chassisBody.velocity
+        this.car.update()
+
+        var vel = this.car.speed.local
         var speed = this.car.speed.velocity
 
-        this.reward = Math.pow(vel[1], 2) - 0.1 * Math.pow(vel[0], 2) - this.car.contact * 10 - this.car.impact * 20
+        this.reward = Math.pow(vel[1], 2) - 0.10 * Math.pow(vel[0], 2) - this.car.contact * 10 - this.car.impact * 20
 
         if (Math.abs(speed) < 1e-2) { // punish no movement; it harms exploration
             this.reward -= 1.0 
         }
 
         this.loss = this.brain.learn(this.reward)
-        this.action = this.brain.policy(d)
+        this.action = this.brain.policy(this.car.sensors.data)
         
-        this.rewardBonus = 0.0
         this.car.impact = 0
+        this.car.step()
     }
     
     if (this.action) {

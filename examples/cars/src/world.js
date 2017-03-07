@@ -1,5 +1,6 @@
 var agent = require('./agent.js')
 var color = require('./color.js')
+var car = require('./car.js')
 
 function world() {
     this.agents = [];
@@ -8,8 +9,8 @@ function world() {
     });
 
     this.p2.solver.tolerance = 5e-2
-    this.p2.solver.iterations = 15
-    this.p2.setGlobalStiffness(1e6)
+    this.p2.solver.iterations = 50
+    this.p2.setGlobalStiffness(1e7)
     this.p2.setGlobalRelaxation(5)
 
     this.age = 0.0
@@ -25,7 +26,7 @@ function world() {
 
     this.obstacles = []
 
-    var input = 118, actions = 2
+    var state = car.Sensors.dimensions, actions = 2, input = 3 * state + 2 * actions
     this.brains = {
 
         actor: new window.neurojs.Network.Model([
@@ -33,7 +34,7 @@ function world() {
             { type: 'input', size: input },
             { type: 'fc', size: 50, activation: 'relu' },
             { type: 'fc', size: 50, activation: 'relu' },
-            { type: 'fc', size: 50, activation: 'relu', dropout: 0.5 },
+            { type: 'fc', size: 50, activation: 'relu', dropout: 0.30 },
             { type: 'fc', size: actions, activation: 'tanh' },
             { type: 'regression' }
 
@@ -43,8 +44,9 @@ function world() {
         critic: new window.neurojs.Network.Model([
 
             { type: 'input', size: input + actions },
-            { type: 'fc', size: 100, activation: 'relu' },
-            { type: 'fc', size: 100, activation: 'relu' },
+            { type: 'fc', size: 70, activation: 'relu' },
+            { type: 'fc', size: 60, activation: 'relu' },
+            { type: 'fc', size: 50, activation: 'relu' },
             { type: 'fc', size: 1 },
             { type: 'regression' }
 
