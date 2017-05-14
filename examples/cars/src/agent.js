@@ -14,14 +14,14 @@ function agent(opt, world) {
     this.timerFrequency = 60 / this.frequency
 
     if (this.options.dynamicallyLoaded !== true) {
-    	this.init(null, null)
+    	this.init(world.brains.actor.newConfiguration(), null)
     }
     
 };
 
 agent.prototype.init = function (actor, critic) {
     var actions = 2
-    var temporal = 2
+    var temporal = 1
     var states = this.car.sensors.dimensions
 
     var input = window.neurojs.Agent.getInputDimension(states, actions, temporal)
@@ -38,7 +38,7 @@ agent.prototype.init = function (actor, critic) {
 
         temporalWindow: temporal, 
 
-        discount: 0.95, 
+        discount: 0.97, 
 
         experience: 75e3, 
         // buffer: window.neurojs.Buffers.UniformReplayBuffer,
@@ -48,11 +48,11 @@ agent.prototype.init = function (actor, critic) {
 
         theta: 0.05, // progressive copy
 
-        alpha: 0.2 // advantage learning
+        alpha: 0.1 // advantage learning
 
     })
 
-    this.world.brains.shared.add('actor', this.brain.algorithm.actor)
+    // this.world.brains.shared.add('actor', this.brain.algorithm.actor)
     this.world.brains.shared.add('critic', this.brain.algorithm.critic)
 
     this.actions = actions

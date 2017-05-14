@@ -191,7 +191,7 @@ class Car {
 
 Car.ShapeEntity = 2
 
-Car.Sensors = (function () {
+Car.Sensors = (() => {
     var d = 0.05
     var r = -0.25 + d, l = +0.25 - d
     var b = -0.50 + d, t = +0.50 - d

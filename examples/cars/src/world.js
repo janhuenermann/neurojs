@@ -8,10 +8,10 @@ function world() {
         gravity : [0,0]
     });
 
-    this.p2.solver.tolerance = 5e-2
+    this.p2.solver.tolerance = 0
     this.p2.solver.iterations = 50
-    this.p2.setGlobalStiffness(1e7)
-    this.p2.setGlobalRelaxation(5)
+    this.p2.setGlobalStiffness(1e8)
+    this.p2.setGlobalRelaxation(1)
 
     this.age = 0.0
     this.timer = 0
@@ -26,15 +26,14 @@ function world() {
 
     this.obstacles = []
 
-    var state = car.Sensors.dimensions, actions = 2, input = 3 * state + 2 * actions
+    var state = car.Sensors.dimensions, actions = 2, input = 2 * state + 1 * actions
     this.brains = {
 
         actor: new window.neurojs.Network.Model([
 
             { type: 'input', size: input },
-            { type: 'fc', size: 50, activation: 'relu' },
-            { type: 'fc', size: 50, activation: 'relu' },
-            { type: 'fc', size: 50, activation: 'relu', dropout: 0.30 },
+            { type: 'fc', size: 60, activation: 'relu' },
+            { type: 'fc', size: 40, activation: 'relu', dropout: 0.30 },
             { type: 'fc', size: actions, activation: 'tanh' },
             { type: 'regression' }
 
@@ -44,6 +43,7 @@ function world() {
         critic: new window.neurojs.Network.Model([
 
             { type: 'input', size: input + actions },
+            { type: 'fc', size: 80, activation: 'relu' },
             { type: 'fc', size: 70, activation: 'relu' },
             { type: 'fc', size: 60, activation: 'relu' },
             { type: 'fc', size: 50, activation: 'relu' },
@@ -56,7 +56,7 @@ function world() {
 
     this.brains.shared = new window.neurojs.Shared.ConfigPool()
 
-    this.brains.shared.set('actor', this.brains.actor.newConfiguration())
+    // this.brains.shared.set('actor', this.brains.actor.newConfiguration())
     this.brains.shared.set('critic', this.brains.critic.newConfiguration())
 };
 
