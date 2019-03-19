@@ -178,6 +178,7 @@ class Model {
 			case 'tanh': return new nonlinear.TanhLayer(inp, opt)
 			case 'relu': return new nonlinear.ReLULayer(inp, opt)
 			case 'elu': return new nonlinear.ELULayer(inp, opt)
+			case 'selu': return new nonlinear.SELULayer(inp, opt)
 			case 'input': return new input.InputLayer(inp, opt)
 			case 'regression': return new regression.RegressionLayer(inp, opt)
 			case 'softmax': return new regression.SoftmaxLayer(inp, opt)
