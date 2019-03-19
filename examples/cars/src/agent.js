@@ -52,7 +52,7 @@ agent.prototype.init = function (actor, critic) {
 
     })
 
-    // this.world.brains.shared.add('actor', this.brain.algorithm.actor)
+    this.world.brains.shared.add('actor', this.brain.algorithm.actor)
     this.world.brains.shared.add('critic', this.brain.algorithm.critic)
 
     this.actions = actions
