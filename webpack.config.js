@@ -6,11 +6,7 @@ const config = {
         path: path.resolve(__dirname, 'build'),
         filename: 'neurojs-v2.js'
     },
-    // module: {
-    //   loaders: [
-    //     { test: /\.js$/, exclude: /node_modules/, loader: "babel-loader" }
-    //   ]
-    // }
+    mode: "development"
 }
 
 module.exports = config

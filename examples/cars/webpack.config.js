@@ -5,7 +5,9 @@ const config = {
     output: {
         path: path.resolve(__dirname, 'build'),
         filename: 'bundle.js'
-    }
+    },
+    mode: "development",
+    devtool: false
 }
 
 module.exports = config
