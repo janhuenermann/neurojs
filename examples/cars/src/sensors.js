@@ -1,5 +1,6 @@
 var color = require('./color.js');
 var car = require('./car.js')
+// var p2 = require('p2')
 
 class Sensor {}
 
@@ -46,38 +47,40 @@ class DistanceSensor extends Sensor {
 
     update() {
         var vehicleBody = this.car.chassisBody;
-        if (vehicleBody.world === null) {
-            this.data.fill(0.0)
-            return
-        }
+        if (vehicleBody.world === null) return;
 
         vehicleBody.toWorldFrame(this.ray.from, this.start);
         vehicleBody.toWorldFrame(this.ray.to, this.end);
-        
+
         this.ray.update();
         this.castedResult.reset();
 
         vehicleBody.world.raycast(this.castedResult, this.ray);
 
-
         if (this.hit = this.castedResult.hasHit()) {
-            this.distance = this.castedResult.fraction
-            this.entity = this.castedResult.shape.entity
+            this.distance = this.castedResult.fraction;
+            this.entity = this.castedResult.shape.entity;
 
-            // vehicleBody.vectorToWorldFrame(this.globalRay, this.rayVector)
+            vehicleBody.vectorToLocalFrame(this.localNormal, this.castedResult.normal);
+            vehicleBody.vectorToWorldFrame(this.globalRay, this.rayVector);
 
-            var angle = Math.atan2( this.castedResult.normal[1], this.castedResult.normal[0] ) - Math.atan2( this.globalRay[1], this.globalRay[0] ) // = Math.atan2( this.localNormal[1], this.localNormal[0] ) - Math.atan2( this.rayVector[1], this.rayVector[0] )    
-            if (angle > Math.PI / 2) angle = Math.PI - angle
-            if (angle < -Math.PI / 2) angle = Math.PI + angle
-            
-            this.data[0] = 1.0 - this.distance
-            // this.data[1] = angle
-            this.data[1] = this.entity === car.ShapeEntity ? 1.0 : 0.0 // is car?
-            this.data[2] = 1.0 // hit?
-        } 
+            this.reflectionAngle = Math.atan2(this.castedResult.normal[1], this.castedResult.normal[0]) - Math.atan2(this.globalRay[1], this.globalRay[0]); // = Math.atan2( this.localNormal[1], this.localNormal[0] ) - Math.atan2( this.rayVector[1], this.rayVector[0] ) 
+            if (this.reflectionAngle > Math.PI / 2) this.reflectionAngle = Math.PI - this.reflectionAngle;
+            if (this.reflectionAngle < -Math.PI / 2) this.reflectionAngle = Math.PI + this.reflectionAngle;
+        } else {
+            this.distance = 1.0;
+            this.entity = 0;
+            this.localNormal[0] = 0;
+            this.localNormal[1] = 0;
+            this.reflectionAngle = 0;
+        }
 
-        else {
-            this.data.fill(0.0)
+        if (this.hit) {
+            this.data[0] = 1.0 - this.distance;
+            this.data[1] = this.reflectionAngle;
+            this.data[2] = this.entity === 2 ? 1.0 : 0.0; // is car?
+        } else {
+            this.data.fill(0.0);
         }
     }
 
@@ -104,8 +107,8 @@ class SpeedSensor extends Sensor {
     update() {
         this.car.chassisBody.vectorToLocalFrame(this.local, this.car.chassisBody.velocity)
         this.data[0] = this.velocity = p2.vec2.len(this.car.chassisBody.velocity) * (this.local[1] > 0 ? 1.0 : -1.0)
-        this.data[1] = this.local[1]
-        this.data[2] = this.local[0]
+        // this.data[1] = this.local[1]
+        // this.data[2] = this.local[0]
     }
 
     draw(g) {
@@ -121,14 +124,75 @@ class SpeedSensor extends Sensor {
 
 }
 
+class PositionSensor extends Sensor {
+
+    constructor(car, opt) {
+        super()
+        this.type = "position"
+        this.car = car
+        this.data = new Float64Array(PositionSensor.dimensions)
+    }
+
+    update() {
+        this.data[0] = this.car.chassisBody.position[0]
+        this.data[1] = this.car.chassisBody.position[1]
+        this.data[2] = Math.sin(this.car.chassisBody.angle)
+        this.data[3] = Math.cos(this.car.chassisBody.angle)
+    }
+
+    draw(g) { }
+
+}
+
+class TargetSensor extends Sensor {
+
+    constructor(car, opt) {
+        super()
+        this.type = "target"
+        this.car = car
+        this.car.target = new Float64Array(2)
+        this.data = new Float64Array(TargetSensor.dimensions)
+    }
+
+    update() {
+        this.data[0] = this.car.target[0]
+        this.data[1] = this.car.target[1]
+
+        var dx = this.car.target[0] - this.car.chassisBody.position[0]
+        var dy = this.car.target[1] - this.car.chassisBody.position[1]
+        this.data[2] = Math.sqrt(dx * dx + dy * dy)
+    }
+
+    draw(g) {
+        if (g.__subgraphic === undefined) {
+            g.__subgraphic = new PIXI.Graphics();
+            g.parent.parent.addChild(g.__subgraphic);
+        }
+
+        g.__subgraphic.beginFill(this.car.chassisBody.color);
+        g.__subgraphic.drawCircle(0, 0, 0.3);
+
+        // var p =  p2.vec2.create()
+        // this.car.chassisBody.toLocalFrame(p, this.car.target);
+
+        g.__subgraphic.x = this.car.target[0]
+        g.__subgraphic.y = this.car.target[1]
+
+    }
+
+}
 
 const sensorTypes = {
     "distance": DistanceSensor,
-    "speed": SpeedSensor
+    "speed": SpeedSensor,
+    "position": PositionSensor,
+    "target": TargetSensor
 }
 
 DistanceSensor.dimensions = 3
-SpeedSensor.dimensions = 3
+SpeedSensor.dimensions = 1
+PositionSensor.dimensions = 4
+TargetSensor.dimensions = 3
 
 class SensorArray {
 
@@ -167,6 +231,8 @@ class SensorArray {
 
 }
 
+
+
 class SensorBlueprint {
 
     constructor(list) {
@@ -189,6 +255,7 @@ class SensorBlueprint {
     }
 
 }
+
 
 
 module.exports = {

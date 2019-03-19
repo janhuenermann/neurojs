@@ -29,24 +29,36 @@ function world() {
     var state = car.Sensors.dimensions, actions = 2, input = 2 * state + 1 * actions
     this.brains = {
 
-        actor: new window.neurojs.Network.Model([
+        actor: new neurojs.Network.Model([
 
             { type: 'input', size: input },
-            { type: 'fc', size: 60, activation: 'relu' },
-            { type: 'fc', size: 40, activation: 'relu', dropout: 0.30 },
+
+            { type: 'fc', size: 40, activation: 'selu' },
+            { type: 'fc', size: 40, activation: 'selu' },
+            { type: 'fc', size: 40, activation: 'selu' },
+
+            { type: 'fc', size: 25, activation: 'selu' },
+            { type: 'fc', size: 25, activation: 'selu' },
+            { type: 'fc', size: 25, activation: 'selu', dropout: 0.25 },
+
             { type: 'fc', size: actions, activation: 'tanh' },
             { type: 'regression' }
 
         ]),
 
 
-        critic: new window.neurojs.Network.Model([
+        critic: new neurojs.Network.Model([
 
             { type: 'input', size: input + actions },
-            { type: 'fc', size: 80, activation: 'relu' },
-            { type: 'fc', size: 70, activation: 'relu' },
-            { type: 'fc', size: 60, activation: 'relu' },
-            { type: 'fc', size: 50, activation: 'relu' },
+
+            { type: 'fc', size: 60, activation: 'selu' },
+            { type: 'fc', size: 50, activation: 'selu' },
+            { type: 'fc', size: 50, activation: 'selu' },
+
+            { type: 'fc', size: 20, activation: 'selu' },
+            { type: 'fc', size: 20, activation: 'selu' },
+            { type: 'fc', size: 20, activation: 'selu' },
+            
             { type: 'fc', size: 1 },
             { type: 'regression' }
 
@@ -158,6 +170,12 @@ world.prototype.init = function (renderer) {
     this.size = { w, h }
 };
 
+world.prototype.initialiseAgents = function (actor, critic) {
+    for (var i = 0; i < this.agents.length; i++) {
+        this.agents[i].init(actor, critic);
+    }
+};
+
 world.prototype.populate = function (n) {
     for (var i = 0; i < n; i++) {
         var ag = new agent({}, this);
@@ -182,11 +200,7 @@ world.prototype.step = function (dt) {
 
     this.brains.shared.step()
 
-    if (!this.plotting && (this.agents[0].brain.training || this.plotRewardOnly) && 1 === this.timer % this.chartFrequency) {
-        this.plotting = true
-    }
-
-    if (this.plotting) {
+    if ((this.agents[0].brain.learning || this.plotRewardOnly) && this.chart) {
         this.chartEphemeralData.push({
             loss: loss / this.agents.length, 
             reward: reward / this.agents.length

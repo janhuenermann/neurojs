@@ -114,27 +114,22 @@
 		<p>Takes the agents about 10 minutes to learn driving. </p>
 
 		<div class="row">
-			<button onclick="window.gcd.goSlow();">Go slow</button>
-			<button onclick="window.gcd.goFast();">Go fast</button>
+			<button onclick="demo.dispatcher.goSlow();">Go slow</button>
+			<button onclick="demo.dispatcher.goFast();">Go fast</button>
 		</div>
+
 		<div class="row">
-			<button onclick="window.downloadBrain(0);">Save agent</button>
-			<button onclick="window.saveEnv();">Save world</button>
+			<button onclick="demo.world.clearObstacles();">Clear world</button>
 		</div>
 		
 		<div class="row">
-			<button onclick="window.gcd.world.clearObstacles();">Clear world</button>
-		</div>
-		
-		<div class="row">
-			<button onclick="document.getElementById('brainFile').click();">Open brain file</button>
-			<button onclick="document.getElementById('worldFile').click();">Open world file</button>
+			<button onclick="document.getElementById('__file').click();">Load from file</button>
+			<button onclick="demo.save();">Save to file</button>
 		</div>
 
-		<input id="brainFile" type='file' accept='*/*' onchange='readBrain(event)' style="display: none">
-		<input id="worldFile" type='file' accept='*/*' onchange='readWorld(event)' style="display: none">
+		<input id="__file" type='file' accept='*/*' onchange='demo.load(event)' style="display: none">
 
-		<div style="margin-top: 20px"><input type="checkbox" onclick="window.updateIfLearning(this.checked);" checked>Learning</div>
+		<div style="margin-top: 20px"><input type="checkbox" onclick="demo.setLearning(this.checked);">Learning</div>
 	</div>
 
 	<div id="container" class="wrap"></div>
