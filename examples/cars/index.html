@@ -111,7 +111,8 @@
 		<p>This page uses the DDPG (deep deterministic policy gradient) algorithm, which means the action space is continuous. 1d for speed control (gas pedal, -1 for braking/going backwards, +1 for max thrust in forward direction) and 1d for stearing (-1 left, 0 straight, +1 right). </p>
 		<p><strong>Click and drag to draw shapes, which must be avoided by the cars.</strong></p>
 
-		<p>Takes the agents about 10 minutes to learn driving. </p>
+		<p>Takes the agents about 15 minutes to learn driving. </p>
+        <p>If you want to skip training, there is a pre-trained agent file in the subfolder agents/ of this demo, which you can load using the button below. </p>
 
 		<div class="row">
 			<button onclick="demo.dispatcher.goSlow();">Go slow</button>
@@ -137,6 +138,32 @@
 	<div class="wrap">
 		<p>Agent's lifespan: <span id="agent-age">0</span>s</p>
 		<div class="ct-chart ct-double-octave app-chart"></div>
+		
+		
+<svg width="356px" height="12px" viewBox="0 0 356 12" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="legend">
+            <g id="Group-2" fill="#000000">
+                <circle id="Oval" cx="6" cy="6" r="6"></circle>
+                <text id="LOSS" font-family="Arial-BoldMT, Arial" font-size="10" font-weight="bold">
+                    <tspan x="24.5" y="9">LOSS</tspan>
+                </text>
+            </g>
+            <g id="Group" transform="translate(90.000000, 0.000000)">
+                <circle id="Oval-Copy" fill="#14D969" cx="6" cy="6" r="6"></circle>
+                <text id="REWARD" font-family="Arial-BoldMT, Arial" font-size="10" font-weight="bold" fill="#000000">
+                    <tspan x="24" y="9">REWARD</tspan>
+                </text>
+            </g>
+            <g id="Group-Copy" transform="translate(180.000000, 0.000000)">
+                <circle id="Oval-Copy" fill="#008000" cx="6" cy="6" r="6"></circle>
+                <text id="REWARD-[RUNNING-AVER" font-family="Arial-BoldMT, Arial" font-size="10" font-weight="bold" fill="#000000">
+                    <tspan x="24.5" y="9">REWARD [RUNNING AVERAGE]</tspan>
+                </text>
+            </g>
+        </g>
+    </g>
+</svg>
 	</div>
 
 	<p class="credits">Made by Jan H&uuml;nermann</p>
