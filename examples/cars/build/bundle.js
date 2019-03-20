@@ -133,21 +133,21 @@ agent.prototype.init = function (actor, critic) {
 
         temporalWindow: temporal, 
 
-        discount: 0.97, 
+        discount: 0.975, 
 
         experience: 75e3, 
         // buffer: window.neurojs.Buffers.UniformReplayBuffer,
 
-        learningPerTick: 40, 
-        startLearningAt: 900,
+        learningPerTick: 50, 
+        startLearningAt: 1200,
 
-        theta: 0.05, // progressive copy
+        theta: 0.075, // progressive copy
 
-        alpha: 0.1 // advantage learning
+        alpha: 0.00 // advantage learning
 
     })
 
-    this.world.brains.shared.add('actor', this.brain.algorithm.actor)
+    // this.world.brains.shared.add('actor', this.brain.algorithm.actor)
     this.world.brains.shared.add('critic', this.brain.algorithm.critic)
 
     this.actions = actions
@@ -168,10 +168,14 @@ agent.prototype.step = function (dt) {
         var vel = this.car.speed.local
         var speed = this.car.speed.velocity
 
-        this.reward = Math.pow(vel[1], 2) - 0.10 * Math.pow(vel[0], 2) - this.car.contact * 10 - this.car.impact * 20
-
-        if (Math.abs(speed) < 1e-2) { // punish no movement; it harms exploration
-            this.reward -= 1.0 
+        if (Math.abs(speed) < 0.1) {
+            this.reward = -1;
+        }
+        else if (speed < 0) {
+            this.reward = 0;
+        }
+        else {
+            this.reward = Math.min(1/2 * Math.log(1 + Math.abs(speed)), 1.0)
         }
 
         this.loss = this.brain.learn(this.reward)
@@ -217,15 +221,13 @@ class Car {
         this.maxBackwardForce = 2
         this.linearDamping = 0.5
 
-        this.contact = 0
+        this.contacts = {"car": 0, "obstacle": 0, "other": 0}
         this.impact = 0
 
         this.world = world
 
         this.init()
     }
-
-    handleKeyInput() {}
 
     init() {
         this.createPhysicalBody()
@@ -241,8 +243,10 @@ class Car {
             damping: 0.2,
             angularDamping: 0.3,
             ccdSpeedThreshold: 0,
-            ccdIterations: 40
+            ccdIterations: 48
         });
+
+        this.chassisBody.entity = 'car';
 
         this.wheels = {}
         this.chassisBody.color = color.randomPastelHex();
@@ -250,7 +254,7 @@ class Car {
         this.chassisBody.damping = this.linearDamping;
 
         var boxShape = new p2.Box({ width: 0.5, height: 1 });
-        boxShape.entity = Car.ShapeEntity
+        boxShape.material = this.world.materials.car
 
         this.chassisBody.addShape(boxShape);
         this.chassisBody.gl_create = (function (sprite, r) {
@@ -379,14 +383,26 @@ class Car {
         this.vehicle.addToWorld(this.world.p2)
 
         this.world.p2.on("beginContact", (event) => {
-            if ((event.bodyA === this.chassisBody || event.bodyB === this.chassisBody)) {
-                this.contact++;
+            let entity = null;
+            if (event.bodyA === this.chassisBody)
+                entity = event.bodyB.entity || 'other'
+            else if (event.bodyB === this.chassisBody)
+                entity = event.bodyA.entity || 'other'
+
+            if (entity !== null && this.contacts[entity] !== undefined) {
+                this.contacts[entity]++
             }
         });
 
         this.world.p2.on("endContact", (event) => {
-            if ((event.bodyA === this.chassisBody || event.bodyB === this.chassisBody)) {
-               this.contact--;
+            let entity = null;
+            if (event.bodyA === this.chassisBody)
+                entity = event.bodyB.entity || 'other'
+            else if (event.bodyB === this.chassisBody)
+                entity = event.bodyA.entity || 'other'
+
+            if (entity !== null && this.contacts[entity] !== undefined) {
+                this.contacts[entity]--
             }
         })
 
@@ -398,6 +414,10 @@ class Car {
                     )
             }
         })
+    }
+
+    hasContact(entity) {
+        return this.contacts[entity] !== undefined && this.contacts[entity] > 0
     }
 
 }
@@ -434,7 +454,8 @@ Car.Sensors = (() => {
         { type: 'distance', angle: +90, length: 7 },
         { type: 'distance', angle: -90, length: 7 },
 
-        { type: 'speed' }
+        { type: 'speed' },
+        { type: 'contact' }
 
     ])
 })()
@@ -602,7 +623,7 @@ function dispatcher(renderer, world) {
     this.keyboard = new keyboard();
     this.keyboard.subscribe((function (k) {
         for (var i = 0; i < this.world.agents.length; i++) {
-            this.world.agents[i].car.handleKeyInput(k);
+            this.world.agents[i].car.handleKeyboard(k);
         }
         
         // if (k.get(189)) {
@@ -859,20 +880,20 @@ function renderer(world, container) {
 
     this.drawPoints = []
 
-    this.elementContainer.addEventListener("mousedown", (function (e) {
-        this.mousedown(this.mousePositionFromEvent(e)) 
-    }).bind(this)); 
+    addEventListener(this.elementContainer, "touchstart mousedown", (e) => {
+        this.mousedown(this.mousePositionFromEvent(e))
+    });
 
-    this.elementContainer.addEventListener("mousemove", (function (e) {
-        if(e.which !== 1)
-            return 
+    addEventListener(this.elementContainer, "touchmove mousemove", (e) => {
+        if (!e.touches && e.which !== 1)
+            return
 
-        this.mousemove(this.mousePositionFromEvent(e)) 
-    }).bind(this))
+        this.mousemove(this.mousePositionFromEvent(e))
+    })
 
-    this.elementContainer.addEventListener("mouseup", (function (e) {
-        this.mouseup(this.mousePositionFromEvent(e))
-    }).bind(this)); 
+    addEventListener(this.elementContainer, "touchend touchcancel mouseup", (e) => {
+        this.mouseup()
+    });
 
     this.pixi.view.style.width = "100%";
     this.pixi.view.style.height = "100%";
@@ -880,7 +901,7 @@ function renderer(world, container) {
     this.elementContainer.appendChild(this.pixi.view);
 
     this.bodies = [];
-    this.viewport = { scale: 35, center: [0,0], width: 0, height: 0 };
+    this.viewport = { scale: 35, center: [0, 0], width: 0, height: 0 };
 
     // resize the canvas to fill browser window dynamically
     window.addEventListener('resize', this.events.resize.bind(this), false);
@@ -898,8 +919,18 @@ renderer.prototype.events.resize = function () {
 
 renderer.prototype.mousePositionFromEvent = function (e) {
     var rect = this.pixi.view.getBoundingClientRect()
-    var x = e.clientX - rect.left
-    var y = e.clientY - rect.top
+    if (e.touches) {
+        var x = e.touches[0].clientX - rect.left
+        var y = e.touches[0].clientY - rect.top
+    }
+    else if (e.clientX && e.clientY) {
+        var x = e.clientX - rect.left
+        var y = e.clientY - rect.top
+    }
+    else {
+        return null;
+    }
+    
     return PIXI.interaction.InteractionData.prototype.getLocalPosition(this.stage, null, new PIXI.Point(x, y))
 };
 
@@ -919,7 +950,7 @@ renderer.prototype.adjustBounds = function () {
     }
 
     this.pixi.resize(this.viewport.width, this.viewport.height)
- };
+};
 
 renderer.prototype.render = function () {
     for (var i = 0; i < this.bodies.length; i++) {
@@ -958,17 +989,17 @@ renderer.prototype.create_sprite = function (body) {
 };
 
 renderer.prototype.draw_path = function (sprite, path, opt) {
-    if (path.length < 2) 
-        return ;
+    if (path.length < 2)
+        return;
 
     if (typeof opt.line !== 'undefined') {
         sprite.lineStyle(opt.line.width, opt.line.color, opt.line.alpha);
     }
-    
+
     if (typeof opt.fill !== 'undefined') {
         sprite.beginFill(opt.fill.color, opt.fill.alpha);
     }
-    
+
     sprite.moveTo(path[0][0], path[0][1]);
     for (var i = 1; i < path.length; i++) {
         var p = path[i];
@@ -1009,17 +1040,17 @@ renderer.prototype.draw_sprite = function (body, sprite) {
         fill: { color: color, alpha: 1.0 }
     }
 
-    if(body.concavePath){
+    if (body.concavePath) {
         var path = []
 
-        for(var j=0; j!==body.concavePath.length; j++){
+        for (var j = 0; j !== body.concavePath.length; j++) {
             var v = body.concavePath[j]
             path.push([v[0], v[1]])
         }
 
         this.draw_path(sprite, path, opt)
 
-        return 
+        return
     }
 
     for (var i = 0; i < body.shapes.length; i++) {
@@ -1041,15 +1072,15 @@ renderer.prototype.draw_sprite = function (body, sprite) {
 
         else if (shape instanceof p2.Convex) {
             var path = [], v = p2.vec2.create();
-            for(var j = 0; j < shape.vertices.length; j++){
+            for (var j = 0; j < shape.vertices.length; j++) {
                 p2.vec2.rotate(v, shape.vertices[j], angle);
-                path.push([v[0]+offset[0], v[1]+offset[1]]);
+                path.push([v[0] + offset[0], v[1] + offset[1]]);
             }
 
             this.draw_path(sprite, path, shape_opt);
         }
     }
-};  
+};
 
 renderer.prototype.add_body = function (body) {
     if (body instanceof p2.Body && body.shapes.length && !body.hidden) {
@@ -1063,7 +1094,7 @@ renderer.prototype.remove_body = function (body) {
     if (body.gl_sprite) {
         this.stage.removeChild(body.gl_sprite)
 
-        for (var i = this.bodies.length; --i; ) {
+        for (var i = this.bodies.length; --i;) {
             if (this.bodies[i] === body) {
                 this.bodies.splice(i, 1);
             }
@@ -1077,14 +1108,14 @@ renderer.prototype.zoom = function (factor) {
 
 var sampling = 0.4
 renderer.prototype.mousedown = function (pos) {
-    this.drawPoints = [ [ pos.x, pos.y ] ]
+    this.drawPoints = [[pos.x, pos.y]]
 };
 
 renderer.prototype.mousemove = function (pos) {
-    pos = [ pos.x, pos.y ]
+    pos = [pos.x, pos.y]
 
-    var sqdist = p2.vec2.distance(pos,this.drawPoints[this.drawPoints.length-1]);
-    if (sqdist > sampling*sampling){
+    var sqdist = p2.vec2.distance(pos, this.drawPoints[this.drawPoints.length - 1]);
+    if (sqdist > sampling * sampling) {
         this.drawPoints.push(pos)
 
         this.drawingGraphic.clear()
@@ -1098,14 +1129,21 @@ renderer.prototype.mousemove = function (pos) {
     }
 }
 
-renderer.prototype.mouseup = function (pos) {
-    if (this.drawPoints.length > 2) {    
+renderer.prototype.mouseup = function () {
+    if (this.drawPoints.length > 2) {
         this.world.addBodyFromPoints(this.drawPoints)
     }
 
     this.drawPoints = []
     this.drawingGraphic.clear()
 };
+
+function addEventListener(el, names, listener) {
+    var events = names.split(' ');
+    for (let i = 0; i < events.length; i++) {
+        el.addEventListener(events[i], listener, false);
+    }
+}
 
 
 module.exports = renderer;
@@ -1154,7 +1192,7 @@ class DistanceSensor extends Sensor {
         this.castedResult = new p2.RaycastResult()
         this.hit = false
         this.distance = 0.0
-        this.entity = 0
+        this.entity = 'none'
 
         this.data = new Float64Array(DistanceSensor.dimensions)
     }
@@ -1180,7 +1218,7 @@ class DistanceSensor extends Sensor {
 
         if (this.hit = this.castedResult.hasHit()) {
             this.distance = this.castedResult.fraction;
-            this.entity = this.castedResult.shape.entity;
+            this.entity = this.castedResult.body.entity || 'none';
 
             vehicleBody.vectorToLocalFrame(this.localNormal, this.castedResult.normal);
             vehicleBody.vectorToWorldFrame(this.globalRay, this.rayVector);
@@ -1190,7 +1228,7 @@ class DistanceSensor extends Sensor {
             if (this.reflectionAngle < -Math.PI / 2) this.reflectionAngle = Math.PI + this.reflectionAngle;
         } else {
             this.distance = 1.0;
-            this.entity = 0;
+            this.entity = 'none';
             this.localNormal[0] = 0;
             this.localNormal[1] = 0;
             this.reflectionAngle = 0;
@@ -1199,7 +1237,7 @@ class DistanceSensor extends Sensor {
         if (this.hit) {
             this.data[0] = 1.0 - this.distance;
             this.data[1] = this.reflectionAngle;
-            this.data[2] = this.entity === 2 ? 1.0 : 0.0; // is car?
+            this.data[2] = this.entity === 'car' ? 1.0 : 0.0; // is car?
         } else {
             this.data.fill(0.0);
         }
@@ -1265,6 +1303,24 @@ class PositionSensor extends Sensor {
 
 }
 
+class ContactSensor extends Sensor {
+
+    constructor(car, opt) {
+        super()
+        this.type = "contact"
+        this.car = car
+        this.data = new Float64Array(ContactSensor.dimensions)
+    }
+
+    update() {
+        this.data[0] = this.car.hasContact('obstacle') ? 1 : 0
+        this.data[1] = this.car.hasContact('car') ? 1 : 0
+    }
+
+    draw(g) { }
+
+}
+
 class TargetSensor extends Sensor {
 
     constructor(car, opt) {
@@ -1307,12 +1363,14 @@ const sensorTypes = {
     "distance": DistanceSensor,
     "speed": SpeedSensor,
     "position": PositionSensor,
-    "target": TargetSensor
+    "target": TargetSensor,
+    "contact": ContactSensor
 }
 
 DistanceSensor.dimensions = 3
 SpeedSensor.dimensions = 1
 PositionSensor.dimensions = 4
+ContactSensor.dimensions = 2
 TargetSensor.dimensions = 3
 
 class SensorArray {
@@ -2606,10 +2664,24 @@ function world() {
         gravity : [0,0]
     });
 
-    this.p2.solver.tolerance = 0
-    this.p2.solver.iterations = 50
-    this.p2.setGlobalStiffness(1e8)
-    this.p2.setGlobalRelaxation(1)
+    this.p2.solver.tolerance = 0.01
+    this.p2.solver.iterations = 60
+    this.p2.setGlobalStiffness(1e6)
+    this.p2.setGlobalRelaxation(4)
+
+    this.materials = {
+        car: new p2.Material(),
+        obstacle: new p2.Material()
+    }
+
+    this.p2.addContactMaterial(new p2.ContactMaterial(this.materials.car, this.materials.obstacle, {
+        friction: 0,
+        relaxation: 1,
+        restitution: 0.01,
+        contactSkinSize: 0.1,
+        stiffness: 1e7
+    }));
+
 
     this.age = 0.0
     this.timer = 0
@@ -2631,13 +2703,12 @@ function world() {
 
             { type: 'input', size: input },
 
-            { type: 'fc', size: 40, activation: 'selu' },
-            { type: 'fc', size: 40, activation: 'selu' },
-            { type: 'fc', size: 40, activation: 'selu' },
-
-            { type: 'fc', size: 25, activation: 'selu' },
-            { type: 'fc', size: 25, activation: 'selu' },
-            { type: 'fc', size: 25, activation: 'selu', dropout: 0.25 },
+            { type: 'fc', size: 32, activation: 'selu' },
+            { type: 'fc', size: 32, activation: 'selu' },
+            { type: 'fc', size: 48, activation: 'selu', dropout: 0.40 },
+            
+            { type: 'fc', size: 12, activation: 'selu' },
+            { type: 'fc', size: 12, activation: 'selu' },
 
             { type: 'fc', size: actions, activation: 'tanh' },
             { type: 'regression' }
@@ -2649,14 +2720,13 @@ function world() {
 
             { type: 'input', size: input + actions },
 
-            { type: 'fc', size: 60, activation: 'selu' },
-            { type: 'fc', size: 50, activation: 'selu' },
-            { type: 'fc', size: 50, activation: 'selu' },
+            { type: 'fc', size: 48, activation: 'selu' },
+            { type: 'fc', size: 48, activation: 'selu' },
+            { type: 'fc', size: 48, activation: 'selu' },
 
-            { type: 'fc', size: 20, activation: 'selu' },
-            { type: 'fc', size: 20, activation: 'selu' },
-            { type: 'fc', size: 20, activation: 'selu' },
-            
+            { type: 'fc', size: 32, activation: 'selu' },
+            { type: 'fc', size: 16, activation: 'selu' },
+
             { type: 'fc', size: 1 },
             { type: 'regression' }
 
@@ -2688,9 +2758,14 @@ world.prototype.addBodyFromCompressedPoints = function (outline) {
 world.prototype.addBodyFromPoints = function (points) {
     var body = new p2.Body({ mass : 0.0 });
     body.color = color.randomPastelHex()
+    body.entity = 'obstacle'
 
     if(!body.fromPolygon(points.slice(0), { removeCollinearPoints: 0.1 })) {
         return 
+    }
+
+    for (let k = 0; k < body.shapes.length; ++k) {
+        body.shapes[k].material = this.materials.obstacle;
     }
 
     var outline = new Float64Array(points.length * 2)
@@ -2728,9 +2803,12 @@ world.prototype.addWall = function (start, end, width) {
         mass : 0.0,
         position : pos
     });
+    b.entity = 'obstacle'
 
     var rectangleShape = new p2.Box({ width: w, height:  h });
     // rectangleShape.color = 0xFFFFFF
+    rectangleShape.material = this.materials.obstacle
+
     b.hidden = true;
     b.addShape(rectangleShape);
     this.p2.addBody(b);
