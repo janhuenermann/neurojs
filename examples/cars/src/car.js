@@ -13,15 +13,13 @@ class Car {
         this.maxBackwardForce = 2
         this.linearDamping = 0.5
 
-        this.contact = 0
+        this.contacts = {"car": 0, "obstacle": 0, "other": 0}
         this.impact = 0
 
         this.world = world
 
         this.init()
     }
-
-    handleKeyInput() {}
 
     init() {
         this.createPhysicalBody()
@@ -37,8 +35,10 @@ class Car {
             damping: 0.2,
             angularDamping: 0.3,
             ccdSpeedThreshold: 0,
-            ccdIterations: 40
+            ccdIterations: 48
         });
+
+        this.chassisBody.entity = 'car';
 
         this.wheels = {}
         this.chassisBody.color = color.randomPastelHex();
@@ -46,7 +46,7 @@ class Car {
         this.chassisBody.damping = this.linearDamping;
 
         var boxShape = new p2.Box({ width: 0.5, height: 1 });
-        boxShape.entity = Car.ShapeEntity
+        boxShape.material = this.world.materials.car
 
         this.chassisBody.addShape(boxShape);
         this.chassisBody.gl_create = (function (sprite, r) {
@@ -175,14 +175,26 @@ class Car {
         this.vehicle.addToWorld(this.world.p2)
 
         this.world.p2.on("beginContact", (event) => {
-            if ((event.bodyA === this.chassisBody || event.bodyB === this.chassisBody)) {
-                this.contact++;
+            let entity = null;
+            if (event.bodyA === this.chassisBody)
+                entity = event.bodyB.entity || 'other'
+            else if (event.bodyB === this.chassisBody)
+                entity = event.bodyA.entity || 'other'
+
+            if (entity !== null && this.contacts[entity] !== undefined) {
+                this.contacts[entity]++
             }
         });
 
         this.world.p2.on("endContact", (event) => {
-            if ((event.bodyA === this.chassisBody || event.bodyB === this.chassisBody)) {
-               this.contact--;
+            let entity = null;
+            if (event.bodyA === this.chassisBody)
+                entity = event.bodyB.entity || 'other'
+            else if (event.bodyB === this.chassisBody)
+                entity = event.bodyA.entity || 'other'
+
+            if (entity !== null && this.contacts[entity] !== undefined) {
+                this.contacts[entity]--
             }
         })
 
@@ -194,6 +206,10 @@ class Car {
                     )
             }
         })
+    }
+
+    hasContact(entity) {
+        return this.contacts[entity] !== undefined && this.contacts[entity] > 0
     }
 
 }
@@ -230,7 +246,8 @@ Car.Sensors = (() => {
         { type: 'distance', angle: +90, length: 7 },
         { type: 'distance', angle: -90, length: 7 },
 
-        { type: 'speed' }
+        { type: 'speed' },
+        { type: 'contact' }
 
     ])
 })()

@@ -8,10 +8,24 @@ function world() {
         gravity : [0,0]
     });
 
-    this.p2.solver.tolerance = 0
-    this.p2.solver.iterations = 50
-    this.p2.setGlobalStiffness(1e8)
-    this.p2.setGlobalRelaxation(1)
+    this.p2.solver.tolerance = 0.01
+    this.p2.solver.iterations = 60
+    this.p2.setGlobalStiffness(1e6)
+    this.p2.setGlobalRelaxation(4)
+
+    this.materials = {
+        car: new p2.Material(),
+        obstacle: new p2.Material()
+    }
+
+    this.p2.addContactMaterial(new p2.ContactMaterial(this.materials.car, this.materials.obstacle, {
+        friction: 0,
+        relaxation: 1,
+        restitution: 0.01,
+        contactSkinSize: 0.1,
+        stiffness: 1e7
+    }));
+
 
     this.age = 0.0
     this.timer = 0
@@ -33,13 +47,12 @@ function world() {
 
             { type: 'input', size: input },
 
-            { type: 'fc', size: 40, activation: 'selu' },
-            { type: 'fc', size: 40, activation: 'selu' },
-            { type: 'fc', size: 40, activation: 'selu' },
-
-            { type: 'fc', size: 25, activation: 'selu' },
-            { type: 'fc', size: 25, activation: 'selu' },
-            { type: 'fc', size: 25, activation: 'selu', dropout: 0.25 },
+            { type: 'fc', size: 32, activation: 'selu' },
+            { type: 'fc', size: 32, activation: 'selu' },
+            { type: 'fc', size: 48, activation: 'selu', dropout: 0.40 },
+            
+            { type: 'fc', size: 12, activation: 'selu' },
+            { type: 'fc', size: 12, activation: 'selu' },
 
             { type: 'fc', size: actions, activation: 'tanh' },
             { type: 'regression' }
@@ -51,14 +64,13 @@ function world() {
 
             { type: 'input', size: input + actions },
 
-            { type: 'fc', size: 60, activation: 'selu' },
-            { type: 'fc', size: 50, activation: 'selu' },
-            { type: 'fc', size: 50, activation: 'selu' },
+            { type: 'fc', size: 48, activation: 'selu' },
+            { type: 'fc', size: 48, activation: 'selu' },
+            { type: 'fc', size: 48, activation: 'selu' },
 
-            { type: 'fc', size: 20, activation: 'selu' },
-            { type: 'fc', size: 20, activation: 'selu' },
-            { type: 'fc', size: 20, activation: 'selu' },
-            
+            { type: 'fc', size: 32, activation: 'selu' },
+            { type: 'fc', size: 16, activation: 'selu' },
+
             { type: 'fc', size: 1 },
             { type: 'regression' }
 
@@ -90,9 +102,14 @@ world.prototype.addBodyFromCompressedPoints = function (outline) {
 world.prototype.addBodyFromPoints = function (points) {
     var body = new p2.Body({ mass : 0.0 });
     body.color = color.randomPastelHex()
+    body.entity = 'obstacle'
 
     if(!body.fromPolygon(points.slice(0), { removeCollinearPoints: 0.1 })) {
         return 
+    }
+
+    for (let k = 0; k < body.shapes.length; ++k) {
+        body.shapes[k].material = this.materials.obstacle;
     }
 
     var outline = new Float64Array(points.length * 2)
@@ -130,9 +147,12 @@ world.prototype.addWall = function (start, end, width) {
         mass : 0.0,
         position : pos
     });
+    b.entity = 'obstacle'
 
     var rectangleShape = new p2.Box({ width: w, height:  h });
     // rectangleShape.color = 0xFFFFFF
+    rectangleShape.material = this.materials.obstacle
+
     b.hidden = true;
     b.addShape(rectangleShape);
     this.p2.addBody(b);
