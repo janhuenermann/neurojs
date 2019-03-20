@@ -11,7 +11,7 @@ function dispatcher(renderer, world) {
     this.keyboard = new keyboard();
     this.keyboard.subscribe((function (k) {
         for (var i = 0; i < this.world.agents.length; i++) {
-            this.world.agents[i].car.handleKeyInput(k);
+            this.world.agents[i].car.handleKeyboard(k);
         }
         
         // if (k.get(189)) {
