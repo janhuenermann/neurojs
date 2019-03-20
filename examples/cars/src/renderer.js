@@ -37,20 +37,20 @@ function renderer(world, container) {
 
     this.drawPoints = []
 
-    this.elementContainer.addEventListener("mousedown", (function (e) {
-        this.mousedown(this.mousePositionFromEvent(e)) 
-    }).bind(this)); 
+    addEventListener(this.elementContainer, "touchstart mousedown", (e) => {
+        this.mousedown(this.mousePositionFromEvent(e))
+    });
 
-    this.elementContainer.addEventListener("mousemove", (function (e) {
-        if(e.which !== 1)
-            return 
+    addEventListener(this.elementContainer, "touchmove mousemove", (e) => {
+        if (!e.touches && e.which !== 1)
+            return
 
-        this.mousemove(this.mousePositionFromEvent(e)) 
-    }).bind(this))
+        this.mousemove(this.mousePositionFromEvent(e))
+    })
 
-    this.elementContainer.addEventListener("mouseup", (function (e) {
-        this.mouseup(this.mousePositionFromEvent(e))
-    }).bind(this)); 
+    addEventListener(this.elementContainer, "touchend touchcancel mouseup", (e) => {
+        this.mouseup()
+    });
 
     this.pixi.view.style.width = "100%";
     this.pixi.view.style.height = "100%";
@@ -58,7 +58,7 @@ function renderer(world, container) {
     this.elementContainer.appendChild(this.pixi.view);
 
     this.bodies = [];
-    this.viewport = { scale: 35, center: [0,0], width: 0, height: 0 };
+    this.viewport = { scale: 35, center: [0, 0], width: 0, height: 0 };
 
     // resize the canvas to fill browser window dynamically
     window.addEventListener('resize', this.events.resize.bind(this), false);
@@ -76,8 +76,18 @@ renderer.prototype.events.resize = function () {
 
 renderer.prototype.mousePositionFromEvent = function (e) {
     var rect = this.pixi.view.getBoundingClientRect()
-    var x = e.clientX - rect.left
-    var y = e.clientY - rect.top
+    if (e.touches) {
+        var x = e.touches[0].clientX - rect.left
+        var y = e.touches[0].clientY - rect.top
+    }
+    else if (e.clientX && e.clientY) {
+        var x = e.clientX - rect.left
+        var y = e.clientY - rect.top
+    }
+    else {
+        return null;
+    }
+    
     return PIXI.interaction.InteractionData.prototype.getLocalPosition(this.stage, null, new PIXI.Point(x, y))
 };
 
@@ -97,7 +107,7 @@ renderer.prototype.adjustBounds = function () {
     }
 
     this.pixi.resize(this.viewport.width, this.viewport.height)
- };
+};
 
 renderer.prototype.render = function () {
     for (var i = 0; i < this.bodies.length; i++) {
@@ -136,17 +146,17 @@ renderer.prototype.create_sprite = function (body) {
 };
 
 renderer.prototype.draw_path = function (sprite, path, opt) {
-    if (path.length < 2) 
-        return ;
+    if (path.length < 2)
+        return;
 
     if (typeof opt.line !== 'undefined') {
         sprite.lineStyle(opt.line.width, opt.line.color, opt.line.alpha);
     }
-    
+
     if (typeof opt.fill !== 'undefined') {
         sprite.beginFill(opt.fill.color, opt.fill.alpha);
     }
-    
+
     sprite.moveTo(path[0][0], path[0][1]);
     for (var i = 1; i < path.length; i++) {
         var p = path[i];
@@ -187,17 +197,17 @@ renderer.prototype.draw_sprite = function (body, sprite) {
         fill: { color: color, alpha: 1.0 }
     }
 
-    if(body.concavePath){
+    if (body.concavePath) {
         var path = []
 
-        for(var j=0; j!==body.concavePath.length; j++){
+        for (var j = 0; j !== body.concavePath.length; j++) {
             var v = body.concavePath[j]
             path.push([v[0], v[1]])
         }
 
         this.draw_path(sprite, path, opt)
 
-        return 
+        return
     }
 
     for (var i = 0; i < body.shapes.length; i++) {
@@ -219,15 +229,15 @@ renderer.prototype.draw_sprite = function (body, sprite) {
 
         else if (shape instanceof p2.Convex) {
             var path = [], v = p2.vec2.create();
-            for(var j = 0; j < shape.vertices.length; j++){
+            for (var j = 0; j < shape.vertices.length; j++) {
                 p2.vec2.rotate(v, shape.vertices[j], angle);
-                path.push([v[0]+offset[0], v[1]+offset[1]]);
+                path.push([v[0] + offset[0], v[1] + offset[1]]);
             }
 
             this.draw_path(sprite, path, shape_opt);
         }
     }
-};  
+};
 
 renderer.prototype.add_body = function (body) {
     if (body instanceof p2.Body && body.shapes.length && !body.hidden) {
@@ -241,7 +251,7 @@ renderer.prototype.remove_body = function (body) {
     if (body.gl_sprite) {
         this.stage.removeChild(body.gl_sprite)
 
-        for (var i = this.bodies.length; --i; ) {
+        for (var i = this.bodies.length; --i;) {
             if (this.bodies[i] === body) {
                 this.bodies.splice(i, 1);
             }
@@ -255,14 +265,14 @@ renderer.prototype.zoom = function (factor) {
 
 var sampling = 0.4
 renderer.prototype.mousedown = function (pos) {
-    this.drawPoints = [ [ pos.x, pos.y ] ]
+    this.drawPoints = [[pos.x, pos.y]]
 };
 
 renderer.prototype.mousemove = function (pos) {
-    pos = [ pos.x, pos.y ]
+    pos = [pos.x, pos.y]
 
-    var sqdist = p2.vec2.distance(pos,this.drawPoints[this.drawPoints.length-1]);
-    if (sqdist > sampling*sampling){
+    var sqdist = p2.vec2.distance(pos, this.drawPoints[this.drawPoints.length - 1]);
+    if (sqdist > sampling * sampling) {
         this.drawPoints.push(pos)
 
         this.drawingGraphic.clear()
@@ -276,14 +286,21 @@ renderer.prototype.mousemove = function (pos) {
     }
 }
 
-renderer.prototype.mouseup = function (pos) {
-    if (this.drawPoints.length > 2) {    
+renderer.prototype.mouseup = function () {
+    if (this.drawPoints.length > 2) {
         this.world.addBodyFromPoints(this.drawPoints)
     }
 
     this.drawPoints = []
     this.drawingGraphic.clear()
 };
+
+function addEventListener(el, names, listener) {
+    var events = names.split(' ');
+    for (let i = 0; i < events.length; i++) {
+        el.addEventListener(events[i], listener, false);
+    }
+}
 
 
 module.exports = renderer;
