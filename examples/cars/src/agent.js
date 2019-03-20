@@ -38,21 +38,21 @@ agent.prototype.init = function (actor, critic) {
 
         temporalWindow: temporal, 
 
-        discount: 0.97, 
+        discount: 0.975, 
 
         experience: 75e3, 
         // buffer: window.neurojs.Buffers.UniformReplayBuffer,
 
-        learningPerTick: 40, 
-        startLearningAt: 900,
+        learningPerTick: 50, 
+        startLearningAt: 1200,
 
-        theta: 0.05, // progressive copy
+        theta: 0.075, // progressive copy
 
-        alpha: 0.1 // advantage learning
+        alpha: 0.00 // advantage learning
 
     })
 
-    this.world.brains.shared.add('actor', this.brain.algorithm.actor)
+    // this.world.brains.shared.add('actor', this.brain.algorithm.actor)
     this.world.brains.shared.add('critic', this.brain.algorithm.critic)
 
     this.actions = actions
@@ -73,10 +73,14 @@ agent.prototype.step = function (dt) {
         var vel = this.car.speed.local
         var speed = this.car.speed.velocity
 
-        this.reward = Math.pow(vel[1], 2) - 0.10 * Math.pow(vel[0], 2) - this.car.contact * 10 - this.car.impact * 20
-
-        if (Math.abs(speed) < 1e-2) { // punish no movement; it harms exploration
-            this.reward -= 1.0 
+        if (Math.abs(speed) < 0.1) {
+            this.reward = -1;
+        }
+        else if (speed < 0) {
+            this.reward = 0;
+        }
+        else {
+            this.reward = Math.min(1/2 * Math.log(1 + Math.abs(speed)), 1.0)
         }
 
         this.loss = this.brain.learn(this.reward)
