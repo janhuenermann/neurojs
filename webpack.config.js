@@ -6,7 +6,8 @@ const config = {
         path: path.resolve(__dirname, 'build'),
         filename: 'neurojs-v2.js'
     },
-    mode: "development"
+    mode: "development",
+    devtool: false
 }
 
 module.exports = config
