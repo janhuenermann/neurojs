@@ -63,14 +63,20 @@ class DDPG extends Algorithm {
 
 		this.actor.useOptimizer({
 			type: 'ascent',
-			method: 'adadelta',
+			method: 'sgd',
+			rate: 0.001,
+			momentum: 0.9,
+			clip: 5,
 			regularization: { l2: 1e-2 }
 		})
 
 		this.critic.useOptimizer({
 			type: 'descent',
-			method: 'adadelta',
-            regularization: { l2: 1e-3 }
+			method: 'sgd',
+			rate: 0.001,
+			momentum: 0.9,
+			clip: 5,
+            regularization: { l2: 1e-2 }
 		})
 
 		// agent
