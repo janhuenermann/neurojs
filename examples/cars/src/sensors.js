@@ -33,7 +33,7 @@ class DistanceSensor extends Sensor {
         this.castedResult = new p2.RaycastResult()
         this.hit = false
         this.distance = 0.0
-        this.entity = 0
+        this.entity = 'none'
 
         this.data = new Float64Array(DistanceSensor.dimensions)
     }
@@ -59,7 +59,7 @@ class DistanceSensor extends Sensor {
 
         if (this.hit = this.castedResult.hasHit()) {
             this.distance = this.castedResult.fraction;
-            this.entity = this.castedResult.shape.entity;
+            this.entity = this.castedResult.body.entity || 'none';
 
             vehicleBody.vectorToLocalFrame(this.localNormal, this.castedResult.normal);
             vehicleBody.vectorToWorldFrame(this.globalRay, this.rayVector);
@@ -69,7 +69,7 @@ class DistanceSensor extends Sensor {
             if (this.reflectionAngle < -Math.PI / 2) this.reflectionAngle = Math.PI + this.reflectionAngle;
         } else {
             this.distance = 1.0;
-            this.entity = 0;
+            this.entity = 'none';
             this.localNormal[0] = 0;
             this.localNormal[1] = 0;
             this.reflectionAngle = 0;
@@ -78,7 +78,7 @@ class DistanceSensor extends Sensor {
         if (this.hit) {
             this.data[0] = 1.0 - this.distance;
             this.data[1] = this.reflectionAngle;
-            this.data[2] = this.entity === 2 ? 1.0 : 0.0; // is car?
+            this.data[2] = this.entity === 'car' ? 1.0 : 0.0; // is car?
         } else {
             this.data.fill(0.0);
         }
@@ -144,6 +144,24 @@ class PositionSensor extends Sensor {
 
 }
 
+class ContactSensor extends Sensor {
+
+    constructor(car, opt) {
+        super()
+        this.type = "contact"
+        this.car = car
+        this.data = new Float64Array(ContactSensor.dimensions)
+    }
+
+    update() {
+        this.data[0] = this.car.hasContact('obstacle') ? 1 : 0
+        this.data[1] = this.car.hasContact('car') ? 1 : 0
+    }
+
+    draw(g) { }
+
+}
+
 class TargetSensor extends Sensor {
 
     constructor(car, opt) {
@@ -186,12 +204,14 @@ const sensorTypes = {
     "distance": DistanceSensor,
     "speed": SpeedSensor,
     "position": PositionSensor,
-    "target": TargetSensor
+    "target": TargetSensor,
+    "contact": ContactSensor
 }
 
 DistanceSensor.dimensions = 3
 SpeedSensor.dimensions = 1
 PositionSensor.dimensions = 4
+ContactSensor.dimensions = 2
 TargetSensor.dimensions = 3
 
 class SensorArray {
