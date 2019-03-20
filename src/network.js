@@ -240,7 +240,10 @@ class Configuration {
 	}
 
 	optimize(accu = true) {
-		if (accu) this.accumulate(Number.isInteger(accu) ? accu : undefined)
+		if (accu) {
+			this.accumulate(Number.isInteger(accu) ? accu : undefined)
+		}
+		
 		this.forEachParameter(param => this.optimizer.apply(param))
 	}
 	

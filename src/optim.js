@@ -60,7 +60,7 @@ Object.assign(String.prototype, {
  *     var optimizer = new Optim({
  *         method: 'adadelta',
  *         regularization: { l2: 1e-2 },
- *         clipping: 5
+ *         clip: 5
  *     })
  * 2. Then create a (weight) tensor:
  *     var toOptimize = new Tensor(100)
@@ -87,7 +87,7 @@ class Optim {
         this.options = Object.assign({
 
             type: 'descent',
-            clipping: 0,
+            clip: 0,
             regularization: {
                 l1: 0,
                 l2: 0
@@ -124,7 +124,7 @@ class Optim {
             stateDefs.push(this.states[i] + '=' + 'dw.' + this.states[i]);
         }
 
-        function _definitions() {
+        const _definitions = () => {
             var defs = '';
             if (stateDefs.length > 0)
                 defs += 'var ' + stateDefs.join(',') + ';';
@@ -135,13 +135,30 @@ class Optim {
             return defs;
         }
 
-        function _gradient() {
-            var producer = '';
-            if (this.options.clipping > 0) {
-                producer += 'grad = grad > opt.clipping ? opt.clipping : (grad < -opt.clipping ? -opt.clipping : grad);\n';
+        const _clip = () => {
+            const clip = this.options.clip;
+            if (clip && clip > 0) {
+                return `
+                let norm = 0.0;
+                for (let k = 0; k < dw.length; k++) {
+                    norm += accdw[k] * accdw[k];	
+                }
+                norm = Math.sqrt(norm) / iteration;
+                if (norm > opt.clip) {
+                    let factor = opt.clip / norm;
+                    for (let k = 0; k < accdw.length; k++) {
+                        accdw[k] *= factor;
+                    }
+                }
+                `;
             }
 
-            var sum = 'grad';
+            return '';
+        }
+
+        const _gradient = () => {
+            var producer = '';
+            var sum = 'grad / iteration';
             if (this.options.regularization.l1 > 0) {
                 produceDefs.push('l1grad');
                 producer += 'l1grad = opt.regularization.l1 * (w[i] > 0 ? ' + regDir + '1 : ' + dir + '1);\n';
@@ -154,27 +171,28 @@ class Optim {
                 sum += '+l2grad';
             }
 
-            producer += 'gij = ' + '(' + sum + ') / iteration' + ';\n';
+            producer += 'gij = ' + sum + ';\n';
 
             return { source: producer };
         }
 
-        function replaceOptionsWithConstants(k, v) {
-            if (typeof v === 'object') {
-                Object.each(v, replaceOptionsWithConstants.bind(this + k + '.'));
-                return;
+        const replaceOptionsWithConstants = (propname, constant) => {
+            if (typeof constant === 'object') {
+                Object.each(constant, (k, v) => replaceOptionsWithConstants(propname + '.' + k, v));
             }
-
-            fn = fn.replaceAll(this + k, v);
+            else {
+                fn = fn.replaceAll(propname, constant);
+            }
         }
 
-        var grad = _gradient.call(this);
+        var grad = _gradient();
 
         var fn =
             `"use strict";
             var w = tensor.w, dw = tensor.dw, accdw = dw.acc;
             var dx, gij, grad, iteration = dw.iteration;
             if (iteration < 1) return ;
+            ${ _clip() }
             ${ _definitions() }
             for (var i = 0; i < w.length; ++i) {
                 grad = accdw[i];
@@ -185,7 +203,7 @@ class Optim {
             }
             dw.iteration = 0;`;
 
-        Object.each(this.options, replaceOptionsWithConstants.bind('opt.'));
+        replaceOptionsWithConstants('opt', this.options);
         return new Function('tensor', fn);
     }
 
