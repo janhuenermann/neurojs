@@ -120,7 +120,9 @@
 		</div>
 
 		<div class="row">
-			<button onclick="demo.world.clearObstacles();">Clear world</button>
+			<button onclick="demo.world.clearObstacles();">Clear track</button>
+			<button onclick="demo.saveTrack();">Export track</button>
+			<button onclick="document.getElementById('__track').click();">Import track</button>
 		</div>
 		
 		<div class="row">
@@ -128,9 +130,15 @@
 			<button onclick="demo.save();">Save to file</button>
 		</div>
 
+		<input id="__track" type='file' accept='*/*' onchange='demo.load(event, true)' style="display: none">
 		<input id="__file" type='file' accept='*/*' onchange='demo.load(event)' style="display: none">
 
-		<div style="margin-top: 20px"><input type="checkbox" onclick="demo.setLearning(this.checked);">Learning</div>
+		<div style="margin-top: 20px">
+			<input type="checkbox" onclick="demo.setLearning(this.checked);"> Learning
+		</div>
+		<div>
+			<input type="checkbox" onclick="demo.setFreeze(this.checked);"> Freeze
+		</div>
 	</div>
 
 	<div id="container" class="wrap"></div>

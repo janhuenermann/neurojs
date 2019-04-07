@@ -14,6 +14,9 @@ class DDPG extends Algorithm {
 		this.options = Object.assign({
 			alpha: 0, // advantage learning (AL) http://arxiv.org/pdf/1512.04860v1.pdf; increase action-gap
 			theta: 0.001, // soft target updates
+			learningRate: { actor: 0.001, critic: 0.001 },
+            clipGradients: { action: 1, parameter: 10 },
+            actionDecay: 0
 		}, agent.options)
 
 
@@ -64,19 +67,19 @@ class DDPG extends Algorithm {
 		this.actor.useOptimizer({
 			type: 'ascent',
 			method: 'sgd',
-			rate: 0.001,
-			momentum: 0.9,
-			clip: 5,
-			regularization: { l2: 1e-2 }
+			rate: this.options.learningRate.actor,
+			momentum: 0.95,
+			clip: this.options.clipGradients.parameter,
+			regularization: { l2: 1e-7 }
 		})
 
 		this.critic.useOptimizer({
 			type: 'descent',
 			method: 'sgd',
-			rate: 0.001,
-			momentum: 0.9,
-			clip: 5,
-            regularization: { l2: 1e-2 }
+			rate: this.options.learningRate.critic,
+			momentum: 0.95,
+			clip: this.options.clipGradients.parameter,
+            regularization: { l2: 1e-7 }
 		})
 
 		// agent
@@ -95,11 +98,20 @@ class DDPG extends Algorithm {
 	}
 
 	act(state, target) {
+        let action;
 		if (target) {
-			return this.actor.target.forward(state)
+			action = this.actor.target.forward(state);
 		}
+		else {
+            action = this.actor.live.forward(state);
+        }
 
-		return this.actor.live.forward(state)
+        /** Clamp action values, for numerical stability.. */
+        for (let k = 0; k < action.length; ++k) {
+            action[k] = Math.min(Math.max(action[k], -32), 32);
+        } 
+
+        return action;
 	}
 
 	value(state, action, target) {
@@ -120,7 +132,7 @@ class DDPG extends Algorithm {
 
 		if (this.options.alpha > 0) {
 			gradAL = grad + this.options.alpha * (value - this.evaluate(e.state0, true)) // advantage learning
-		}
+		} // gradAL = value * (1 + alpha) - (target + alpha * max Q)
 
 		if (descent) {
 			var isw = this.buffer.getImportanceSamplingWeight(e)
@@ -133,17 +145,32 @@ class DDPG extends Algorithm {
 	}
 
 	teach(e, isw = 1.0, descent = true) {
-		var action = this.actor.live.forward(e.state0)  // which action to take?
-		var val = this.value(e.state0, action) // how good will the future be, if i take this action?
-		var grad = this.critic.live.derivatives(0, false) // how will the future change, if i change this action
+		let action = this.actor.live.forward(e.state0)  // which action to take?
+		let val = this.value(e.state0, action) // how good will the future be, if i take this action?
+		let grad = this.critic.live.derivatives(0, false) // how will the future change, if i change this action
+        let norm = 0.0; 
 
-		for (var i = 0; i < this.options.actions; i++) {
-			this.actor.live.out.dw[i] = grad[this.input + i] * isw
+        for (var i = 0; i < this.options.actions; ++i) {
+            if (action[i] > 32 || action[i] < -32) {
+                grad[this.input + i] = 0;
+            }
+        }
+
+		for (var i = 0; i < this.options.actions; ++i) {
+			norm += (grad[this.input + i] * isw) ** 2;
 		}
 
+        norm = Math.sqrt(norm);
+        let normScaling = Math.min(1.0, this.options.clipGradients.action / norm);
+
+        for (var i = 0; i < this.options.actions; ++i) {
+            this.actor.live.out.dw[i] = grad[this.input + i] * isw * normScaling 
+                                        - this.options.actionDecay * this.actor.live.out.w[i];
+        }
+
 		if (descent) {
-			this.actor.live.backward() // propagate change
-			this.actor.config.accumulate()
+			this.actor.live.backward(); // propagate change
+			this.actor.config.accumulate();
 		}
 	}
 

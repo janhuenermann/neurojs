@@ -31,7 +31,7 @@ function renderer(world, container) {
     // this.pixi.backgroundColor = 0xFFFFFF;
 
     this.stage = new PIXI.Container()
-    this.container = new PIXI.DisplayObjectContainer()
+    this.container = new PIXI.DisplayObjectContainer();
 
     this.stage.addChild(this.container)
 

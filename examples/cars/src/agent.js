@@ -1,33 +1,34 @@
 var car = require('./car.js');
 
 function agent(opt, world) {
-    this.car = new car(world, {})
-    this.options = opt
+    this.car = new car(world, {});
+    this.options = opt;
 
-    this.world = world
-    this.frequency = 20
-    this.reward = 0
-    this.loaded = false
+    this.world = world;
+    this.frequency = 30;
+    this.reward = 0;
+    this.loaded = false;
 
-    this.loss = 0
-    this.timer = 0
-    this.timerFrequency = 60 / this.frequency
+    this.loss = 0;
+    this.timer = 0.0;
+
+    this.thrust = 0;
+    this.steer = 0;
+    this.velocity = [];
 
     if (this.options.dynamicallyLoaded !== true) {
-    	this.init(world.brains.actor.newConfiguration(), null)
+    	this.init(world.brains.actor.newConfiguration(), null);
     }
-    
 };
 
 agent.prototype.init = function (actor, critic) {
-    var actions = 2
+    var actions = 3
     var temporal = 1
     var states = this.car.sensors.dimensions
 
     var input = window.neurojs.Agent.getInputDimension(states, actions, temporal)
 
     this.brain = new window.neurojs.Agent({
-
         actor: actor,
         critic: critic,
 
@@ -38,63 +39,105 @@ agent.prototype.init = function (actor, critic) {
 
         temporalWindow: temporal, 
 
-        discount: 0.975, 
+        discount: 0.98, 
+        learningRate: {
+            actor: 1e-4, 
+            critic: 1e-3
+        },
 
-        experience: 75e3, 
+        experience: 100e3, 
         // buffer: window.neurojs.Buffers.UniformReplayBuffer,
 
-        learningPerTick: 50, 
+        learningPerTick: 40, 
         startLearningAt: 1200,
 
-        theta: 0.075, // progressive copy
+        theta: 0.050, // progressive copy
+        alpha: 0.000, // advantage learning
 
-        alpha: 0.00 // advantage learning
-
+        clipGradients: { action: 10, parameter: 10 },
+        // actionDecay: 1e-5
     })
 
     // this.world.brains.shared.add('actor', this.brain.algorithm.actor)
     this.world.brains.shared.add('critic', this.brain.algorithm.critic)
 
     this.actions = actions
+
+    this.car.agent = this
     this.car.addToWorld()
 	this.loaded = true
 };
+
+function sigmoid(x) { return 1.0/(1.0 + Math.exp(-x)); }
 
 agent.prototype.step = function (dt) {
 	if (!this.loaded) {
 		return 
 	}
 
-    this.timer++
+    this.timer += dt
 
-    if (this.timer % this.timerFrequency === 0) {
+    if (this.timer >= 1.0 / this.frequency) {
         this.car.update()
 
-        var vel = this.car.speed.local
-        var speed = this.car.speed.velocity
+        this.reward = this.generateReward(); // Math.max(-1.0, reward);
 
-        if (Math.abs(speed) < 0.1) {
-            this.reward = -1;
-        }
-        else if (speed < 0) {
-            this.reward = 0;
-        }
-        else {
-            this.reward = Math.min(1/2 * Math.log(1 + Math.abs(speed)), 1.0)
+        this.loss = this.brain.learn(this.reward);
+        this.action = this.brain.policy(this.car.sensors.data);
+
+        let thrust = this.action[0];
+        let steer = this.action[1];
+
+        if (isNaN(steer) || isNaN(thrust)) {
+            alert("STOPPING.. some action value is NaN. steer: " + steer + "; thrust: " + thrust);
         }
 
-        this.loss = this.brain.learn(this.reward)
-        this.action = this.brain.policy(this.car.sensors.data)
+        this.thrust = thrust;
+        this.steer = steer;
         
-        this.car.impact = 0
-        this.car.step()
+        this.car.impact = 0;
+        this.car.reward = this.reward;
+
+        this.car.step();
+        this.timer = 0.0;
     }
     
     if (this.action) {
-        this.car.handle(this.action[0], this.action[1])
+        this.car.handle(this.thrust, this.steer);
+    }
+};
+
+agent.prototype.generateReward = function () {
+    let pos = this.car.chassisBody.position;
+    let vel = this.car.speed.local;
+    let speed = this.car.speed.velocity;
+    let reward = 0;
+
+    const velOneSecAgo = this.velocity.length >= this.frequency 
+                            ? this.velocity.shift()
+                            : 0;
+
+    // If we are not moving or have contact, this is bad.
+    if (this.car.hasContact('obstacle') || this.car.hasContact('car')) {
+        reward = -1; // avoid at all cost
+    }
+    else if (Math.abs(speed) < 0.05) {
+        reward = -1; // standing still is bad
+    }
+    else if (speed < 0 || this.steer ** 2 > 0.50) {
+        reward = 0; // no driving in circles
+    }
+    else {
+        reward = Math.abs(vel[1]) / 36;
     }
 
-    return this.timer % this.timerFrequency === 0
+    if (isNaN(reward)) {
+        reward = 0;
+    }
+
+    this.velocity.push(vel[1]);
+
+    return Math.min(Math.max(-1.0, reward), 2.0);
 };
 
 agent.prototype.draw = function (context) {

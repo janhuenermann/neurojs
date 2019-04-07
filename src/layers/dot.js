@@ -56,7 +56,10 @@ class FullyConnectedLayer {
 		var X = this.dimensions.input.length, Y = this.dimensions.output.length
 
 		if (this.options.init) {
-			params.w.randn(0.0, this.options.init)
+            if (typeof this.options.init === 'number') 
+			    params.w.randn(0.0, this.options.init)
+            else if (this.options.init instanceof Array) 
+                params.w.randf(this.options.init[0], this.options.init[1])
 		}
 
 		else {

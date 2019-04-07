@@ -26,13 +26,19 @@ class CarDemo {
         downloadFile(new DataView(fusedBuf), "agent.bin");
     }
 
-    load(event) {
+    load(event, trackOnly = false) {
         var input = event.target;
 
         var reader = new FileReader();
         reader.onload = () => {
             const buffer = reader.result
-            this.import(buffer);
+
+            if (trackOnly) {
+                this.importTrack(buffer);
+            }
+            else {
+                this.import(buffer);
+            }
         };
 
         reader.readAsArrayBuffer(input.files[0]);
@@ -41,26 +47,40 @@ class CarDemo {
     import (buffer) {
         var imported = neurojs.Binary.Reader.read(buffer)
 
-        this.importEnv(imported[0])
+        this.importTrack(imported[0])
         this.importBrain(imported[1]) 
     }
 
-    importEnv (buffer) {
-        this.world.import(buffer)
+    saveTrack() {
+        downloadFile(this.exportTrack())
+    }
+
+    exportTrack() {
+        return this.world.export();
+    }
+
+    importTrack (buffer) {
+        this.world.import(buffer);
     }
 
     importBrain (buffer) {
-        var imported = neurojs.NetOnDisk.readMultiPart(buffer)
-        this.world.initialiseAgents(imported.actor, null)
-        this.dispatcher.begin()
+        var imported = neurojs.NetOnDisk.readMultiPart(buffer);
+        this.world.initialiseAgents(imported.actor, null);
+        this.dispatcher.begin();
+
+        this.setLearning(false);
     }
 
     setLearning(learning) {
         for (var i = 0; i <  this.world.agents.length; i++) {
-            this.world.agents[i].brain.learning = learning
+            this.world.agents[i].brain.learning = learning;
         }
     
-        this.world.plotRewardOnly = !learning
+        this.world.plotRewardOnly = !learning;
+    }
+
+    setFreeze(freeze) {
+        this.world.freeze = freeze;
     }
 
 }

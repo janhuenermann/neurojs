@@ -113,7 +113,6 @@ class Optim {
 
     assemble(dir) {
         var method = Optim.methods[this.method];
-        var regDir = dir === '+' ? '-' : '+'
 
         var performer = (method.deliver ? method.deliver(this.options) : method.perform).decompile();
         var stateDefs = [], produceDefs = [];
@@ -158,20 +157,26 @@ class Optim {
 
         const _gradient = () => {
             var producer = '';
-            var sum = 'grad / iteration';
+            var regSum = [];
             if (this.options.regularization.l1 > 0) {
                 produceDefs.push('l1grad');
-                producer += 'l1grad = opt.regularization.l1 * (w[i] > 0 ? ' + regDir + '1 : ' + dir + '1);\n';
-                sum += '+l1grad';
+                producer += 'l1grad = opt.regularization.l1 * (w[i] > 0 ? 1 : -1);\n';
+                regSum.push('l1grad');
             }
 
             if (this.options.regularization.l2 > 0) {
                 produceDefs.push('l2grad');
-                producer += 'l2grad = opt.regularization.l2 * w[i] * ' + regDir + '1.0;\n';
-                sum += '+l2grad';
+                producer += 'l2grad = opt.regularization.l2 * w[i];\n';
+                regSum.push('l2grad');
             }
 
-            producer += 'gij = ' + sum + ';\n';
+            produceDefs.push('decay = 0');
+
+            if (regSum.length) {
+                producer += 'decay = ' + regSum.join('+') + '; \n';
+            }
+
+            producer += 'gij = grad / iteration;\n';
 
             return { source: producer };
         }
@@ -199,6 +204,7 @@ class Optim {
                 ${ grad.source }
                 ${ performer.source }
                 w[i] ${ dir }= dx;
+                w[i] -= decay;
                 accdw[i] = 0.0;
             }
             dw.iteration = 0;`;

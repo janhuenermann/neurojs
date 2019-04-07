@@ -8,7 +8,7 @@ function world() {
         gravity : [0,0]
     });
 
-    this.p2.solver.tolerance = 0.01
+    this.p2.solver.tolerance = 0.02
     this.p2.solver.iterations = 60
     this.p2.setGlobalStiffness(1e6)
     this.p2.setGlobalRelaxation(4)
@@ -19,11 +19,20 @@ function world() {
     }
 
     this.p2.addContactMaterial(new p2.ContactMaterial(this.materials.car, this.materials.obstacle, {
-        friction: 0,
-        relaxation: 1,
-        restitution: 0.01,
+        friction: 0.01,
+        relaxation: 4,
+        restitution: 0.005,
         contactSkinSize: 0.1,
-        stiffness: 1e7
+        stiffness: 1e6
+    }));
+
+
+    this.p2.addContactMaterial(new p2.ContactMaterial(this.materials.car, this.materials.car, {
+        friction: 0,
+        relaxation: 4,
+        restitution: 0,
+        contactSkinSize: 0.1,
+        stiffness: 1e6
     }));
 
 
@@ -37,22 +46,24 @@ function world() {
     this.smoothReward = 0
 
     this.plotRewardOnly = false
+    this.freeze = false;
 
     this.obstacles = []
 
-    var state = car.Sensors.dimensions, actions = 2, input = 2 * state + 1 * actions
+    const temporal = 1
+    var state = car.Sensors.dimensions, actions = 3, input = (1 + temporal) * state + temporal * actions
     this.brains = {
 
         actor: new neurojs.Network.Model([
 
             { type: 'input', size: input },
 
-            { type: 'fc', size: 32, activation: 'selu' },
-            { type: 'fc', size: 32, activation: 'selu' },
-            { type: 'fc', size: 48, activation: 'selu', dropout: 0.40 },
-            
-            { type: 'fc', size: 12, activation: 'selu' },
-            { type: 'fc', size: 12, activation: 'selu' },
+            { type: 'fc', size: 50, activation: 'elu' },
+            { type: 'fc', size: 40, activation: 'elu', dropout: 0.50 },
+            { type: 'fc', size: 40, activation: 'elu', dropout: 0.10 },
+            { type: 'fc', size: 40, activation: 'elu', dropout: 0.10 },
+
+            { type: 'fc', size: 8, activation: 'relu' },
 
             { type: 'fc', size: actions, activation: 'tanh' },
             { type: 'regression' }
@@ -64,12 +75,10 @@ function world() {
 
             { type: 'input', size: input + actions },
 
-            { type: 'fc', size: 48, activation: 'selu' },
-            { type: 'fc', size: 48, activation: 'selu' },
-            { type: 'fc', size: 48, activation: 'selu' },
-
-            { type: 'fc', size: 32, activation: 'selu' },
-            { type: 'fc', size: 16, activation: 'selu' },
+            { type: 'fc', size: 60, activation: 'relu' },
+            { type: 'fc', size: 50, activation: 'relu' },
+            { type: 'fc', size: 50, activation: 'relu' },
+            { type: 'fc', size: 50, activation: 'relu' },
 
             { type: 'fc', size: 1 },
             { type: 'regression' }
@@ -120,6 +129,8 @@ world.prototype.addBodyFromPoints = function (points) {
 
     body.outline = outline
     this.addObstacle(body)
+
+    this.p2.step(1, 1, 1)
 };
 
 world.prototype.addObstacle = function (obstacle) {
@@ -207,15 +218,22 @@ world.prototype.resize = function (renderer) {
 };
 
 world.prototype.step = function (dt) {
-    if (dt >= 0.02)  dt = 0.02;
+    if (dt >= 0.1)  {
+        dt = 0.1;
+    }
 
+    if (this.freeze) {
+        return 
+    }
+    
     ++this.timer
 
-    var loss = 0.0, reward = 0.0, agentUpdate = false
+    var loss = 0.0, reward = 0.0
     for (var i = 0; i < this.agents.length; i++) {
-        agentUpdate = this.agents[i].step(dt);
-        loss += this.agents[i].loss
-        reward += this.agents[i].reward
+        this.agents[i].step(dt);
+
+        loss += this.agents[i].loss;
+        reward += this.agents[i].reward;
     }
 
     this.brains.shared.step()
@@ -231,7 +249,6 @@ world.prototype.step = function (dt) {
             this.chartEphemeralData = []
         }
     }
-    
 
     this.p2.step(1 / 60, dt, 10);
     this.age += dt
@@ -323,24 +340,29 @@ world.prototype.clearObstacles = function () {
 world.prototype.import = function (buf) {
     this.clearObstacles()
 
-    var contents = window.neurojs.Binary.Reader.read(buf)
-    var j = -1
-    var meta = contents[++j]
+    let contents = window.neurojs.Binary.Reader.read(buf)
+    let meta = contents.shift()
+    let agents = contents.pop()
+    let obstacles = contents;
 
-    for (var i = 0; i < meta.obstacles; i++) {
-        this.addBodyFromCompressedPoints(contents[++j])
-    }
-
-    var agents = contents[++j]
-
-    if (agents.length !== this.agents.length) {
+    if (agents.length < this.agents.length) {
         throw 'error';
     }
 
-    for (var i = 0; i < agents.length; i++) {
-        this.agents[i].car.chassisBody.position = agents[i].location
-        this.agents[i].car.chassisBody.angle = agents[i].angle
+    for (var i = 0; i < this.agents.length; i++) {
+        let chassis = this.agents[i].car.chassisBody;
+        chassis.setZeroForce();
+        p2.vec2.set(chassis.velocity, 0, 0);
+        p2.vec2.copy(chassis.position, agents[i].location);
+        chassis.angle = agents[i].angle;
+        chassis.updateAABB();
     }
+
+    for (var i = 0; i < obstacles.length; i++) {
+        this.addBodyFromCompressedPoints(obstacles[i])
+    }
+
+    this.p2.step(1, 1, 1);
 };
 
 module.exports = world;

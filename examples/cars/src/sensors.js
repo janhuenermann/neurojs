@@ -107,8 +107,8 @@ class SpeedSensor extends Sensor {
     update() {
         this.car.chassisBody.vectorToLocalFrame(this.local, this.car.chassisBody.velocity)
         this.data[0] = this.velocity = p2.vec2.len(this.car.chassisBody.velocity) * (this.local[1] > 0 ? 1.0 : -1.0)
-        // this.data[1] = this.local[1]
-        // this.data[2] = this.local[0]
+        this.data[1] = this.local[1]
+        this.data[2] = this.local[0]
     }
 
     draw(g) {
@@ -209,7 +209,7 @@ const sensorTypes = {
 }
 
 DistanceSensor.dimensions = 3
-SpeedSensor.dimensions = 1
+SpeedSensor.dimensions = 3
 PositionSensor.dimensions = 4
 ContactSensor.dimensions = 2
 TargetSensor.dimensions = 3

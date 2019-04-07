@@ -96,33 +96,34 @@
 var car = __webpack_require__(/*! ./car.js */ "./src/car.js");
 
 function agent(opt, world) {
-    this.car = new car(world, {})
-    this.options = opt
+    this.car = new car(world, {});
+    this.options = opt;
 
-    this.world = world
-    this.frequency = 20
-    this.reward = 0
-    this.loaded = false
+    this.world = world;
+    this.frequency = 30;
+    this.reward = 0;
+    this.loaded = false;
 
-    this.loss = 0
-    this.timer = 0
-    this.timerFrequency = 60 / this.frequency
+    this.loss = 0;
+    this.timer = 0.0;
+
+    this.thrust = 0;
+    this.steer = 0;
+    this.velocity = [];
 
     if (this.options.dynamicallyLoaded !== true) {
-    	this.init(world.brains.actor.newConfiguration(), null)
+    	this.init(world.brains.actor.newConfiguration(), null);
     }
-    
 };
 
 agent.prototype.init = function (actor, critic) {
-    var actions = 2
+    var actions = 3
     var temporal = 1
     var states = this.car.sensors.dimensions
 
     var input = window.neurojs.Agent.getInputDimension(states, actions, temporal)
 
     this.brain = new window.neurojs.Agent({
-
         actor: actor,
         critic: critic,
 
@@ -133,63 +134,105 @@ agent.prototype.init = function (actor, critic) {
 
         temporalWindow: temporal, 
 
-        discount: 0.975, 
+        discount: 0.98, 
+        learningRate: {
+            actor: 1e-4, 
+            critic: 1e-3
+        },
 
-        experience: 75e3, 
+        experience: 100e3, 
         // buffer: window.neurojs.Buffers.UniformReplayBuffer,
 
-        learningPerTick: 50, 
+        learningPerTick: 40, 
         startLearningAt: 1200,
 
-        theta: 0.075, // progressive copy
+        theta: 0.050, // progressive copy
+        alpha: 0.000, // advantage learning
 
-        alpha: 0.00 // advantage learning
-
+        clipGradients: { action: 10, parameter: 10 },
+        // actionDecay: 1e-5
     })
 
     // this.world.brains.shared.add('actor', this.brain.algorithm.actor)
     this.world.brains.shared.add('critic', this.brain.algorithm.critic)
 
     this.actions = actions
+
+    this.car.agent = this
     this.car.addToWorld()
 	this.loaded = true
 };
+
+function sigmoid(x) { return 1.0/(1.0 + Math.exp(-x)); }
 
 agent.prototype.step = function (dt) {
 	if (!this.loaded) {
 		return 
 	}
 
-    this.timer++
+    this.timer += dt
 
-    if (this.timer % this.timerFrequency === 0) {
+    if (this.timer >= 1.0 / this.frequency) {
         this.car.update()
 
-        var vel = this.car.speed.local
-        var speed = this.car.speed.velocity
+        this.reward = this.generateReward(); // Math.max(-1.0, reward);
 
-        if (Math.abs(speed) < 0.1) {
-            this.reward = -1;
-        }
-        else if (speed < 0) {
-            this.reward = 0;
-        }
-        else {
-            this.reward = Math.min(1/2 * Math.log(1 + Math.abs(speed)), 1.0)
+        this.loss = this.brain.learn(this.reward);
+        this.action = this.brain.policy(this.car.sensors.data);
+
+        let thrust = this.action[0];
+        let steer = this.action[1];
+
+        if (isNaN(steer) || isNaN(thrust)) {
+            alert("STOPPING.. some action value is NaN. steer: " + steer + "; thrust: " + thrust);
         }
 
-        this.loss = this.brain.learn(this.reward)
-        this.action = this.brain.policy(this.car.sensors.data)
+        this.thrust = thrust;
+        this.steer = steer;
         
-        this.car.impact = 0
-        this.car.step()
+        this.car.impact = 0;
+        this.car.reward = this.reward;
+
+        this.car.step();
+        this.timer = 0.0;
     }
     
     if (this.action) {
-        this.car.handle(this.action[0], this.action[1])
+        this.car.handle(this.thrust, this.steer);
+    }
+};
+
+agent.prototype.generateReward = function () {
+    let pos = this.car.chassisBody.position;
+    let vel = this.car.speed.local;
+    let speed = this.car.speed.velocity;
+    let reward = 0;
+
+    const velOneSecAgo = this.velocity.length >= this.frequency 
+                            ? this.velocity.shift()
+                            : 0;
+
+    // If we are not moving or have contact, this is bad.
+    if (this.car.hasContact('obstacle') || this.car.hasContact('car')) {
+        reward = -1; // avoid at all cost
+    }
+    else if (Math.abs(speed) < 0.05) {
+        reward = -1; // standing still is bad
+    }
+    else if (speed < 0 || this.steer ** 2 > 0.50) {
+        reward = 0; // no driving in circles
+    }
+    else {
+        reward = Math.abs(vel[1]) / 36;
     }
 
-    return this.timer % this.timerFrequency === 0
+    if (isNaN(reward)) {
+        reward = 0;
+    }
+
+    this.velocity.push(vel[1]);
+
+    return Math.min(Math.max(-1.0, reward), 2.0);
 };
 
 agent.prototype.draw = function (context) {
@@ -217,7 +260,7 @@ class Car {
     constructor(world, opt) {
         this.maxSteer = Math.PI / 7
         this.maxEngineForce = 10
-        this.maxBrakeForce = 5
+        this.maxBrakeForce = 20
         this.maxBackwardForce = 2
         this.linearDamping = 0.5
 
@@ -225,6 +268,7 @@ class Car {
         this.impact = 0
 
         this.world = world
+        this.agent = null
 
         this.init()
     }
@@ -316,8 +360,8 @@ class Car {
         // Back wheel
         this.backWheel = this.vehicle.addWheel({
             localPosition: [0, -0.5] // back
-        })
-        this.backWheel.setSideFriction(45) // Less side friction on back wheel makes it easier to drift
+        });
+        this.backWheel.setSideFriction(40); // Less side friction on back wheel makes it easier to drift
     }
 
     update() {
@@ -334,12 +378,19 @@ class Car {
         }
 
         this.overlay.clear() 
+
+        if (this.agent) {
+            this.overlay.lineStyle(0.1, 0, 0.5);
+            this.overlay.moveTo(0, 0);
+            this.overlay.lineTo(0, this.agent.reward);
+        }
+
         this.sensors.draw(this.overlay)
     }
 
     handle(throttle, steer) {
         // Steer value zero means straight forward. Positive is left and negative right.
-        this.frontWheel.steerValue = this.maxSteer * steer
+        this.frontWheel.steerValue = this.maxSteer * steer * Math.PI / 2
 
         // Engine force forward
         var force = throttle * this.maxEngineForce
@@ -359,7 +410,7 @@ class Car {
         }
 
         this.wheels.topLeft.rotation = this.frontWheel.steerValue * 0.7071067812
-        this.wheels.topRight.rotation = this.frontWheel.steerValue * 0.7071067812
+        this.wheels.topRight.rotation = this.frontWheel.steerValue  * 0.7071067812
     }
 
     handleKeyboard(k) {
@@ -373,11 +424,13 @@ class Car {
 
 
     addToWorld() {
-        if (!this.chassisBody.positioned) {
-            this.chassisBody.position[0] = (Math.random() - .5) * this.world.size.w;
-            this.chassisBody.position[1] = (Math.random() - .5) * this.world.size.h;
-            this.chassisBody.angle = (Math.random() * 2.0 - 1.0) * Math.PI;
+        if (this.chassisBody.world) {
+            return ;
         }
+
+        this.chassisBody.position[0] = (Math.random() - .5) * this.world.size.w;
+        this.chassisBody.position[1] = (Math.random() - .5) * this.world.size.h;
+        this.chassisBody.angle = (Math.random() * 2.0 - 1.0) * Math.PI;
 
         this.world.p2.addBody(this.chassisBody)
         this.vehicle.addToWorld(this.world.p2)
@@ -499,13 +552,19 @@ class CarDemo {
         downloadFile(new DataView(fusedBuf), "agent.bin");
     }
 
-    load(event) {
+    load(event, trackOnly = false) {
         var input = event.target;
 
         var reader = new FileReader();
         reader.onload = () => {
             const buffer = reader.result
-            this.import(buffer);
+
+            if (trackOnly) {
+                this.importTrack(buffer);
+            }
+            else {
+                this.import(buffer);
+            }
         };
 
         reader.readAsArrayBuffer(input.files[0]);
@@ -514,26 +573,40 @@ class CarDemo {
     import (buffer) {
         var imported = neurojs.Binary.Reader.read(buffer)
 
-        this.importEnv(imported[0])
+        this.importTrack(imported[0])
         this.importBrain(imported[1]) 
     }
 
-    importEnv (buffer) {
-        this.world.import(buffer)
+    saveTrack() {
+        downloadFile(this.exportTrack())
+    }
+
+    exportTrack() {
+        return this.world.export();
+    }
+
+    importTrack (buffer) {
+        this.world.import(buffer);
     }
 
     importBrain (buffer) {
-        var imported = neurojs.NetOnDisk.readMultiPart(buffer)
-        this.world.initialiseAgents(imported.actor, null)
-        this.dispatcher.begin()
+        var imported = neurojs.NetOnDisk.readMultiPart(buffer);
+        this.world.initialiseAgents(imported.actor, null);
+        this.dispatcher.begin();
+
+        this.setLearning(false);
     }
 
     setLearning(learning) {
         for (var i = 0; i <  this.world.agents.length; i++) {
-            this.world.agents[i].brain.learning = learning
+            this.world.agents[i].brain.learning = learning;
         }
     
-        this.world.plotRewardOnly = !learning
+        this.world.plotRewardOnly = !learning;
+    }
+
+    setFreeze(freeze) {
+        this.world.freeze = freeze;
     }
 
 }
@@ -616,26 +689,29 @@ var keyboard = __webpack_require__(/*! ./keyboard.js */ "./src/keyboard.js");
 function dispatcher(renderer, world) {
     this.renderer = renderer;
     this.world = world;
-    this.running = true;
-    this.interval = false;
-    this.step = 0;
+    this.animating = true;
+    this.counter = 0;
 
     this.keyboard = new keyboard();
     this.keyboard.subscribe((function (k) {
         for (var i = 0; i < this.world.agents.length; i++) {
             this.world.agents[i].car.handleKeyboard(k);
         }
-        
-        // if (k.get(189)) {
-        //     this.renderer.zoom(0.9);
-        // }
-
-        // if (k.get(187)) {
-        //     this.renderer.zoom(1.1);
-        // }
     }).bind(this));
 
-    this.__loop = this.loop.bind(this);
+    this.animationLoop = (now) => {
+        if (this.animating) { 
+            requestAnimFrame(this.animationLoop.bind(this));
+        }
+
+        const dt = this.dt();
+        this.step(dt);
+    };
+
+    this.intervalLoop = () => {
+        const dt = 1/60;
+        this.step(dt);
+    };
 }
 
 dispatcher.prototype.dt = function () {
@@ -646,55 +722,48 @@ dispatcher.prototype.dt = function () {
     return diff / 1000;
 };
 
-dispatcher.prototype.loop = function () {
-    if (this.running && !this.interval) {  // start next timer
-        requestAnimFrame(this.__loop);
-    }
-
-    var dt = 1.0 / 60.0
-
+dispatcher.prototype.step = function (dt) {
     // compute phyiscs
     this.world.step(dt);
-    this.step++;
+    this.counter++;
 
     // draw everything
-    if (!this.interval || this.step % 5 === 0)
+    if (this.animating || this.counter % 20 == 0) {
         this.renderer.render();
-
+    }
 };
 
-dispatcher.prototype.begin = function () {
-    this.running = true;
+dispatcher.prototype.begin = function (mode = 'animation') {
+    if (this.interval) {
+        clearInterval(this.interval);
+    }
 
-    if (this.__interval && !this.interval)
-        clearInterval(this.__interval)
+    if (mode === 'interval') {
+        this.animating = false;
+        this.interval = setInterval(this.intervalLoop, 0);
+    }
+    else if (mode === 'animation') {
+        this.animating = true;
+        requestAnimFrame(this.animationLoop);
+    }
+    else {
+        throw 'Unknown mode.';
+    }
 
-    if (this.interval)
-        this.__interval = setInterval(this.__loop, 0)
-    else
-        requestAnimFrame(this.__loop)
+    this.mode = mode;
 };
 
 dispatcher.prototype.goFast = function () {
-    if (this.interval)
-        return
-
-    this.interval = true
-    this.begin()
+    this.begin('interval');
 };
 
 dispatcher.prototype.goSlow = function () {
-    if (!this.__interval)
-        return 
-
-    clearInterval(this.__interval)
-    this.interval = false;
-
-    this.begin()
+    this.begin('animation');
 }
 
 dispatcher.prototype.stop = function () {
-    this.running = false;
+    this.animating = false;
+    clearInterval(this.interval);
 };
 
 module.exports = dispatcher;
@@ -874,7 +943,7 @@ function renderer(world, container) {
     // this.pixi.backgroundColor = 0xFFFFFF;
 
     this.stage = new PIXI.Container()
-    this.container = new PIXI.DisplayObjectContainer()
+    this.container = new PIXI.DisplayObjectContainer();
 
     this.stage.addChild(this.container)
 
@@ -1266,8 +1335,8 @@ class SpeedSensor extends Sensor {
     update() {
         this.car.chassisBody.vectorToLocalFrame(this.local, this.car.chassisBody.velocity)
         this.data[0] = this.velocity = p2.vec2.len(this.car.chassisBody.velocity) * (this.local[1] > 0 ? 1.0 : -1.0)
-        // this.data[1] = this.local[1]
-        // this.data[2] = this.local[0]
+        this.data[1] = this.local[1]
+        this.data[2] = this.local[0]
     }
 
     draw(g) {
@@ -1368,7 +1437,7 @@ const sensorTypes = {
 }
 
 DistanceSensor.dimensions = 3
-SpeedSensor.dimensions = 1
+SpeedSensor.dimensions = 3
 PositionSensor.dimensions = 4
 ContactSensor.dimensions = 2
 TargetSensor.dimensions = 3
@@ -2664,7 +2733,7 @@ function world() {
         gravity : [0,0]
     });
 
-    this.p2.solver.tolerance = 0.01
+    this.p2.solver.tolerance = 0.02
     this.p2.solver.iterations = 60
     this.p2.setGlobalStiffness(1e6)
     this.p2.setGlobalRelaxation(4)
@@ -2675,11 +2744,20 @@ function world() {
     }
 
     this.p2.addContactMaterial(new p2.ContactMaterial(this.materials.car, this.materials.obstacle, {
-        friction: 0,
-        relaxation: 1,
-        restitution: 0.01,
+        friction: 0.01,
+        relaxation: 4,
+        restitution: 0.005,
         contactSkinSize: 0.1,
-        stiffness: 1e7
+        stiffness: 1e6
+    }));
+
+
+    this.p2.addContactMaterial(new p2.ContactMaterial(this.materials.car, this.materials.car, {
+        friction: 0,
+        relaxation: 4,
+        restitution: 0,
+        contactSkinSize: 0.1,
+        stiffness: 1e6
     }));
 
 
@@ -2693,22 +2771,24 @@ function world() {
     this.smoothReward = 0
 
     this.plotRewardOnly = false
+    this.freeze = false;
 
     this.obstacles = []
 
-    var state = car.Sensors.dimensions, actions = 2, input = 2 * state + 1 * actions
+    const temporal = 1
+    var state = car.Sensors.dimensions, actions = 3, input = (1 + temporal) * state + temporal * actions
     this.brains = {
 
         actor: new neurojs.Network.Model([
 
             { type: 'input', size: input },
 
-            { type: 'fc', size: 32, activation: 'selu' },
-            { type: 'fc', size: 32, activation: 'selu' },
-            { type: 'fc', size: 48, activation: 'selu', dropout: 0.40 },
-            
-            { type: 'fc', size: 12, activation: 'selu' },
-            { type: 'fc', size: 12, activation: 'selu' },
+            { type: 'fc', size: 50, activation: 'elu' },
+            { type: 'fc', size: 40, activation: 'elu', dropout: 0.50 },
+            { type: 'fc', size: 40, activation: 'elu', dropout: 0.10 },
+            { type: 'fc', size: 40, activation: 'elu', dropout: 0.10 },
+
+            { type: 'fc', size: 8, activation: 'relu' },
 
             { type: 'fc', size: actions, activation: 'tanh' },
             { type: 'regression' }
@@ -2720,12 +2800,10 @@ function world() {
 
             { type: 'input', size: input + actions },
 
-            { type: 'fc', size: 48, activation: 'selu' },
-            { type: 'fc', size: 48, activation: 'selu' },
-            { type: 'fc', size: 48, activation: 'selu' },
-
-            { type: 'fc', size: 32, activation: 'selu' },
-            { type: 'fc', size: 16, activation: 'selu' },
+            { type: 'fc', size: 60, activation: 'relu' },
+            { type: 'fc', size: 50, activation: 'relu' },
+            { type: 'fc', size: 50, activation: 'relu' },
+            { type: 'fc', size: 50, activation: 'relu' },
 
             { type: 'fc', size: 1 },
             { type: 'regression' }
@@ -2776,6 +2854,8 @@ world.prototype.addBodyFromPoints = function (points) {
 
     body.outline = outline
     this.addObstacle(body)
+
+    this.p2.step(1, 1, 1)
 };
 
 world.prototype.addObstacle = function (obstacle) {
@@ -2863,15 +2943,22 @@ world.prototype.resize = function (renderer) {
 };
 
 world.prototype.step = function (dt) {
-    if (dt >= 0.02)  dt = 0.02;
+    if (dt >= 0.1)  {
+        dt = 0.1;
+    }
 
+    if (this.freeze) {
+        return 
+    }
+    
     ++this.timer
 
-    var loss = 0.0, reward = 0.0, agentUpdate = false
+    var loss = 0.0, reward = 0.0
     for (var i = 0; i < this.agents.length; i++) {
-        agentUpdate = this.agents[i].step(dt);
-        loss += this.agents[i].loss
-        reward += this.agents[i].reward
+        this.agents[i].step(dt);
+
+        loss += this.agents[i].loss;
+        reward += this.agents[i].reward;
     }
 
     this.brains.shared.step()
@@ -2887,7 +2974,6 @@ world.prototype.step = function (dt) {
             this.chartEphemeralData = []
         }
     }
-    
 
     this.p2.step(1 / 60, dt, 10);
     this.age += dt
@@ -2979,24 +3065,29 @@ world.prototype.clearObstacles = function () {
 world.prototype.import = function (buf) {
     this.clearObstacles()
 
-    var contents = window.neurojs.Binary.Reader.read(buf)
-    var j = -1
-    var meta = contents[++j]
+    let contents = window.neurojs.Binary.Reader.read(buf)
+    let meta = contents.shift()
+    let agents = contents.pop()
+    let obstacles = contents;
 
-    for (var i = 0; i < meta.obstacles; i++) {
-        this.addBodyFromCompressedPoints(contents[++j])
-    }
-
-    var agents = contents[++j]
-
-    if (agents.length !== this.agents.length) {
+    if (agents.length < this.agents.length) {
         throw 'error';
     }
 
-    for (var i = 0; i < agents.length; i++) {
-        this.agents[i].car.chassisBody.position = agents[i].location
-        this.agents[i].car.chassisBody.angle = agents[i].angle
+    for (var i = 0; i < this.agents.length; i++) {
+        let chassis = this.agents[i].car.chassisBody;
+        chassis.setZeroForce();
+        p2.vec2.set(chassis.velocity, 0, 0);
+        p2.vec2.copy(chassis.position, agents[i].location);
+        chassis.angle = agents[i].angle;
+        chassis.updateAABB();
     }
+
+    for (var i = 0; i < obstacles.length; i++) {
+        this.addBodyFromCompressedPoints(obstacles[i])
+    }
+
+    this.p2.step(1, 1, 1);
 };
 
 module.exports = world;

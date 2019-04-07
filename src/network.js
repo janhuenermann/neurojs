@@ -177,6 +177,7 @@ class Model {
 			case 'sigmoid': return new nonlinear.SigmoidLayer(inp, opt)
 			case 'tanh': return new nonlinear.TanhLayer(inp, opt)
 			case 'relu': return new nonlinear.ReLULayer(inp, opt)
+			case 'leaky-relu': return new nonlinear.ReLULayer(inp, Object.assign({ leaky: 0.10 }, opt))
 			case 'elu': return new nonlinear.ELULayer(inp, opt)
 			case 'selu': return new nonlinear.SELULayer(inp, opt)
 			case 'input': return new input.InputLayer(inp, opt)

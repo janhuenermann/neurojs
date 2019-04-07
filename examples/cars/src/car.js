@@ -9,7 +9,7 @@ class Car {
     constructor(world, opt) {
         this.maxSteer = Math.PI / 7
         this.maxEngineForce = 10
-        this.maxBrakeForce = 5
+        this.maxBrakeForce = 20
         this.maxBackwardForce = 2
         this.linearDamping = 0.5
 
@@ -17,6 +17,7 @@ class Car {
         this.impact = 0
 
         this.world = world
+        this.agent = null
 
         this.init()
     }
@@ -108,8 +109,8 @@ class Car {
         // Back wheel
         this.backWheel = this.vehicle.addWheel({
             localPosition: [0, -0.5] // back
-        })
-        this.backWheel.setSideFriction(45) // Less side friction on back wheel makes it easier to drift
+        });
+        this.backWheel.setSideFriction(40); // Less side friction on back wheel makes it easier to drift
     }
 
     update() {
@@ -126,12 +127,19 @@ class Car {
         }
 
         this.overlay.clear() 
+
+        if (this.agent) {
+            this.overlay.lineStyle(0.1, 0, 0.5);
+            this.overlay.moveTo(0, 0);
+            this.overlay.lineTo(0, this.agent.reward);
+        }
+
         this.sensors.draw(this.overlay)
     }
 
     handle(throttle, steer) {
         // Steer value zero means straight forward. Positive is left and negative right.
-        this.frontWheel.steerValue = this.maxSteer * steer
+        this.frontWheel.steerValue = this.maxSteer * steer * Math.PI / 2
 
         // Engine force forward
         var force = throttle * this.maxEngineForce
@@ -151,7 +159,7 @@ class Car {
         }
 
         this.wheels.topLeft.rotation = this.frontWheel.steerValue * 0.7071067812
-        this.wheels.topRight.rotation = this.frontWheel.steerValue * 0.7071067812
+        this.wheels.topRight.rotation = this.frontWheel.steerValue  * 0.7071067812
     }
 
     handleKeyboard(k) {
@@ -165,11 +173,13 @@ class Car {
 
 
     addToWorld() {
-        if (!this.chassisBody.positioned) {
-            this.chassisBody.position[0] = (Math.random() - .5) * this.world.size.w;
-            this.chassisBody.position[1] = (Math.random() - .5) * this.world.size.h;
-            this.chassisBody.angle = (Math.random() * 2.0 - 1.0) * Math.PI;
+        if (this.chassisBody.world) {
+            return ;
         }
+
+        this.chassisBody.position[0] = (Math.random() - .5) * this.world.size.w;
+        this.chassisBody.position[1] = (Math.random() - .5) * this.world.size.h;
+        this.chassisBody.angle = (Math.random() * 2.0 - 1.0) * Math.PI;
 
         this.world.p2.addBody(this.chassisBody)
         this.vehicle.addToWorld(this.world.p2)
