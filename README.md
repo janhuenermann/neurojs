@@ -4,6 +4,8 @@ neurojs is a JavaScript framework for deep learning in the browser. It mainly fo
 
 Feel free to contribute. The development on such projects is more awesome in a community!
 
+**Note: this repo is no longer maintained since more general frameworks such as TensorFlow-JS emerged, which I recommend you to use.**
+
 ### Features
 - Implements a full-stack neural-network based machine learning framework
 - Extended reinforcement-learning support
