@@ -1,4 +1,4 @@
-<p align="center"><img src="images/logo-with-demo.png" width="450px"/></p>
+<img src="./images/logo-flt.png" alt="Spline Solver" height="40"> <!--<p align="center"><img src="images/logo-with-demo.png" width="450px"/></p>-->
 
 neurojs is a JavaScript framework for deep learning in the browser. It mainly focuses on reinforcement learning, but can be used for any neural network based task. It contains neat demos to visualise these capabilities, for instance a 2D self-driving car. 
 
